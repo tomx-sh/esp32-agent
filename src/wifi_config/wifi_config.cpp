@@ -3,6 +3,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 
+#include "audio/audio.h"
 #include "ui/ui.h"
 
 namespace {
@@ -19,8 +20,29 @@ void handleRoot() {
       200,
       "text/html",
       "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" "
-      "content=\"width=device-width, initial-scale=1\"></head><body><h1>Hello "
-      "from ESP32</h1><p>Config panel scaffold is running.</p></body></html>");
+      "content=\"width=device-width, initial-scale=1\"><title>ESP32 Config</title>"
+      "<style>body{font-family:system-ui,sans-serif;padding:24px;line-height:1.4}"
+      "button{font:inherit;padding:12px 16px}#status{margin-top:12px;color:#444}"
+      "code{display:block;margin-top:12px;padding:12px;background:#f4f4f4;"
+      "border-radius:8px;overflow:auto}</style>"
+      "</head><body><h1>ESP32 Config</h1><p>Device is online.</p>"
+      "<button id=\"beep\">Play beep</button><p id=\"status\"></p>"
+      "<p>Programmatic trigger:</p><code>curl -X POST http://192.168.4.1/beep</code>"
+      "<script>const button=document.getElementById('beep');const status=document.getElementById('status');"
+      "button.addEventListener('click',async()=>{button.disabled=true;status.textContent='Playing...';"
+      "try{const response=await fetch('/beep',{method:'POST'});"
+      "status.textContent=response.ok?'Beep played':'Beep failed';}"
+      "catch(e){status.textContent='Request failed';}"
+      "button.disabled=false;});</script></body></html>");
+}
+
+void handleBeep() {
+  if (audio_play_beep()) {
+    server.send(200, "text/plain", "ok");
+    return;
+  }
+
+  server.send(500, "text/plain", "beep failed");
 }
 }  // namespace
 
@@ -49,6 +71,7 @@ void wifi_config_init() {
   String url = "http://" + ip.toString() + "/";
 
   server.on("/", HTTP_GET, handleRoot);
+  server.on("/beep", HTTP_POST, handleBeep);
   server.begin();
 
   ui_set_network_info(kAccessPointSsid, url.c_str());

@@ -19,6 +19,7 @@ constexpr float kBeepDurationSeconds = 0.18f;
 constexpr float kBeepAmplitude = 0.22f;
 
 I2SClass i2s;
+bool audioReady = false;
 
 esp_err_t codec_init() {
   es8311_handle_t codec = es8311_create(0, ES8311_ADDRRES_0);
@@ -63,9 +64,12 @@ esp_err_t codec_init() {
 
   return es8311_microphone_gain_set(codec, kMicGain);
 }
-}  // namespace
 
-bool audio_play_startup_beep() {
+bool ensure_audio_ready() {
+  if (audioReady) {
+    return true;
+  }
+
   pinMode(AUDIO_PA, OUTPUT);
   digitalWrite(AUDIO_PA, HIGH);
 
@@ -85,6 +89,16 @@ bool audio_play_startup_beep() {
   const esp_err_t codecErr = codec_init();
   if (codecErr != ESP_OK) {
     Serial.printf("Audio init failed: ES8311 error %d\n", static_cast<int>(codecErr));
+    return false;
+  }
+
+  audioReady = true;
+  return true;
+}
+}  // namespace
+
+bool audio_play_beep() {
+  if (!ensure_audio_ready()) {
     return false;
   }
 
@@ -113,6 +127,6 @@ bool audio_play_startup_beep() {
     }
   }
 
-  Serial.println("Startup beep played");
+  Serial.println("Beep played");
   return true;
 }

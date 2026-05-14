@@ -68,7 +68,7 @@ void setup() {
       sizeof(drawBuffer),
       LV_DISPLAY_RENDER_MODE_PARTIAL);
 
-  audio_play_startup_beep();
+  audio_play_beep();
   ui_create();
   wifi_config_init();
 
