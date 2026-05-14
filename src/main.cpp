@@ -3,9 +3,9 @@
 #include <display/Arduino_SH8601.h>
 #include <lvgl.h>
 
-#include "ble/ble.h"
 #include "pin_config.h"
 #include "ui/ui.h"
+#include "wifi_config/wifi_config.h"
 
 namespace {
 constexpr uint32_t kLvglTickMs = 5;
@@ -68,7 +68,7 @@ void setup() {
       LV_DISPLAY_RENDER_MODE_PARTIAL);
 
   ui_create();
-  ble_init();
+  wifi_config_init();
 
   Serial.println("Display ready");
 }
@@ -80,5 +80,6 @@ void loop() {
   lastTick = now;
 
   lv_timer_handler();
+  wifi_config_loop();
   delay(kLvglTickMs);
 }
