@@ -4,6 +4,7 @@
 #include <lvgl.h>
 
 #include "pin_config.h"
+#include "ui/ui.h"
 
 namespace {
 constexpr uint32_t kLvglTickMs = 5;
@@ -65,13 +66,7 @@ void setup() {
       sizeof(drawBuffer),
       LV_DISPLAY_RENDER_MODE_PARTIAL);
 
-  lv_obj_set_style_bg_color(lv_screen_active(), lv_color_black(), 0);
-
-  lv_obj_t *label = lv_label_create(lv_screen_active());
-  lv_label_set_text(label, "Hello, LVGL 9");
-  lv_obj_set_style_text_color(label, lv_color_white(), 0);
-  lv_obj_set_style_text_font(label, &lv_font_montserrat_32, 0);
-  lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
+  ui_create();
 
   Serial.println("Display ready");
 }
