@@ -3,6 +3,7 @@
 #include <display/Arduino_SH8601.h>
 #include <lvgl.h>
 
+#include "ble/ble.h"
 #include "pin_config.h"
 #include "ui/ui.h"
 
@@ -67,6 +68,7 @@ void setup() {
       LV_DISPLAY_RENDER_MODE_PARTIAL);
 
   ui_create();
+  ble_init();
 
   Serial.println("Display ready");
 }
