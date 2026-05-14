@@ -12,28 +12,126 @@ constexpr char kAccessPointPassword[] = "esp32setup";
 const IPAddress kAccessPointIp(192, 168, 4, 1);
 const IPAddress kGatewayIp(192, 168, 4, 1);
 const IPAddress kSubnetMask(255, 255, 255, 0);
+constexpr unsigned long kStationConnectTimeoutMs = 10000;
+constexpr unsigned long kForgetDelayMs = 1000;
 
 WebServer server(80);
+String stationStatus = "Not connected";
+String stationSsid = "";
+bool accessPointEnabled = false;
+bool forgetWifiPending = false;
+unsigned long forgetWifiAtMs = 0;
+
+void refresh_ui() {
+  const bool stationConnected = WiFi.status() == WL_CONNECTED;
+  const bool apActive = accessPointEnabled;
+
+  String headline;
+  String details;
+
+  if (stationConnected) {
+    headline = "WiFi:\nConnected to " + stationSsid;
+    details = "Dashboard:\nhttp://" + WiFi.localIP().toString() + "/";
+
+    if (apActive) {
+      headline += "\n\nHotspot:\n" + String(kAccessPointSsid);
+      details += "\n\nPassword:\n" + String(kAccessPointPassword) +
+                 "\nDashboard:\nhttp://" + WiFi.softAPIP().toString() + "/";
+    }
+  } else if (apActive) {
+    headline = "WiFi:\nNot connected\n\nHotspot:\n" + String(kAccessPointSsid);
+    details = "Password:\n" + String(kAccessPointPassword) +
+              "\nDashboard:\nhttp://" + WiFi.softAPIP().toString() + "/";
+  } else {
+    headline = "Wi-Fi not connected";
+    details = "No hotspot active";
+  }
+
+  ui_set_connection_overview(headline.c_str(), details.c_str());
+}
+
+bool connect_station() {
+  const unsigned long startMs = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - startMs < kStationConnectTimeoutMs) {
+    delay(250);
+  }
+
+  return WiFi.status() == WL_CONNECTED;
+}
+
+bool start_access_point() {
+  if (!WiFi.softAPConfig(kAccessPointIp, kGatewayIp, kSubnetMask)) {
+    Serial.println("Wi-Fi softAPConfig failed");
+    ui_set_status_message("Wi-Fi Error", "AP config failed");
+    return false;
+  }
+
+  if (!WiFi.softAP(kAccessPointSsid, kAccessPointPassword)) {
+    Serial.println("Wi-Fi softAP start failed");
+    ui_set_status_message("Wi-Fi Error", "AP start failed");
+    return false;
+  }
+
+  const IPAddress ip = WiFi.softAPIP();
+  if (ip == IPAddress((uint32_t)0)) {
+    Serial.println("Wi-Fi softAP has no IP");
+    ui_set_status_message("Wi-Fi Error", "AP has no IP");
+    return false;
+  }
+
+  const String url = "http://" + ip.toString() + "/";
+
+  accessPointEnabled = true;
+  refresh_ui();
+
+  Serial.printf("Wi-Fi AP started: %s\n", kAccessPointSsid);
+  Serial.printf("Wi-Fi URL: %s\n", url.c_str());
+  return true;
+}
 
 void handleRoot() {
-  server.send(
-      200,
-      "text/html",
+  const String baseUrl = "http://" + server.hostHeader();
+
+  String html =
       "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" "
       "content=\"width=device-width, initial-scale=1\"><title>ESP32 Config</title>"
-      "<style>body{font-family:system-ui,sans-serif;padding:24px;line-height:1.4}"
-      "button{font:inherit;padding:12px 16px}#status{margin-top:12px;color:#444}"
-      "code{display:block;margin-top:12px;padding:12px;background:#f4f4f4;"
-      "border-radius:8px;overflow:auto}</style>"
       "</head><body><h1>ESP32 Config</h1><p>Device is online.</p>"
+      "<p id=\"wifi-status\">Router status: " +
+      stationStatus +
+      "</p>"
+      "<form id=\"wifi-form\"><label for=\"ssid\">Router SSID</label>"
+      "<input id=\"ssid\" name=\"ssid\" autocomplete=\"off\" required>"
+      "<label for=\"password\">Router password</label>"
+      "<input id=\"password\" name=\"password\" type=\"password\">"
+      "<p><button type=\"submit\">Connect to router</button></p></form>"
+      "<p><button id=\"forget\" type=\"button\">Forget WiFi</button></p>"
       "<button id=\"beep\">Play beep</button><p id=\"status\"></p>"
-      "<p>Programmatic trigger:</p><code>curl -X POST http://192.168.4.1/beep</code>"
-      "<script>const button=document.getElementById('beep');const status=document.getElementById('status');"
+      "<p>Programmatic trigger:</p><code>curl -X POST " +
+      baseUrl +
+      "/beep</code>"
+      "<script>const button=document.getElementById('beep');"
+      "const forget=document.getElementById('forget');"
+      "const form=document.getElementById('wifi-form');"
+      "const status=document.getElementById('status');"
+      "const wifiStatus=document.getElementById('wifi-status');"
+      "form.addEventListener('submit',async(e)=>{e.preventDefault();"
+      "const formData=new FormData(form);status.textContent='Connecting to router...';"
+      "try{const response=await fetch('/connect',{method:'POST',body:new URLSearchParams(formData)});"
+      "const text=await response.text();status.textContent=text;"
+      "wifiStatus.textContent='Router status: '+text;}"
+      "catch(e){status.textContent='Connection request failed';}});"
       "button.addEventListener('click',async()=>{button.disabled=true;status.textContent='Playing...';"
       "try{const response=await fetch('/beep',{method:'POST'});"
       "status.textContent=response.ok?'Beep played':'Beep failed';}"
       "catch(e){status.textContent='Request failed';}"
-      "button.disabled=false;});</script></body></html>");
+      "button.disabled=false;});"
+      "forget.addEventListener('click',async()=>{forget.disabled=true;status.textContent='Forgetting WiFi...';"
+      "try{const response=await fetch('/forget',{method:'POST'});"
+      "const text=await response.text();status.textContent=text;wifiStatus.textContent='Router status: '+text;}"
+      "catch(e){status.textContent='Forget request failed';forget.disabled=false;}});"
+      "</script></body></html>";
+
+  server.send(200, "text/html", html);
 }
 
 void handleBeep() {
@@ -44,42 +142,88 @@ void handleBeep() {
 
   server.send(500, "text/plain", "beep failed");
 }
+
+void handleConnect() {
+  if (!server.hasArg("ssid")) {
+    server.send(400, "text/plain", "Missing ssid");
+    return;
+  }
+
+  const String ssid = server.arg("ssid");
+  const String password = server.arg("password");
+
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.persistent(true);
+  WiFi.disconnect(false, true);
+  WiFi.begin(ssid.c_str(), password.c_str());
+
+  if (connect_station()) {
+    stationSsid = ssid;
+    stationStatus = "Connected to " + ssid + " (" + WiFi.localIP().toString() + ")";
+    refresh_ui();
+    Serial.printf("Wi-Fi STA connected: %s\n", stationStatus.c_str());
+    server.send(200, "text/plain", stationStatus);
+    return;
+  }
+
+  stationStatus = "Connection failed for " + ssid;
+  refresh_ui();
+  Serial.printf("Wi-Fi STA connection failed: %s\n", ssid.c_str());
+  server.send(500, "text/plain", stationStatus);
+}
+
+void handleForget() {
+  stationStatus = "Forgetting saved WiFi credentials";
+  stationSsid = "";
+  forgetWifiPending = true;
+  forgetWifiAtMs = millis() + kForgetDelayMs;
+  server.send(200, "text/plain", stationStatus);
+}
+
+void process_pending_forget() {
+  if (!forgetWifiPending || millis() < forgetWifiAtMs) {
+    return;
+  }
+
+  forgetWifiPending = false;
+  WiFi.persistent(true);
+  WiFi.disconnect(false, true);
+  stationStatus = "Not connected";
+  stationSsid = "";
+
+  if (!accessPointEnabled) {
+    start_access_point();
+  } else {
+    refresh_ui();
+  }
+
+  Serial.println("Saved Wi-Fi credentials forgotten");
+}
 }  // namespace
 
 void wifi_config_init() {
-  WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.persistent(true);
+  WiFi.begin();
 
-  if (!WiFi.softAPConfig(kAccessPointIp, kGatewayIp, kSubnetMask)) {
-    Serial.println("Wi-Fi softAPConfig failed");
-    ui_set_status_message("Wi-Fi Error", "AP config failed");
-    return;
+  if (connect_station()) {
+    stationSsid = WiFi.SSID();
+    stationStatus = "Connected to saved Wi-Fi (" + WiFi.localIP().toString() + ")";
+    Serial.printf("Wi-Fi STA auto-connected: %s\n", stationStatus.c_str());
+    refresh_ui();
+  } else {
+    stationStatus = "Not connected";
+    start_access_point();
   }
-
-  if (!WiFi.softAP(kAccessPointSsid, kAccessPointPassword)) {
-    Serial.println("Wi-Fi softAP start failed");
-    ui_set_status_message("Wi-Fi Error", "AP start failed");
-    return;
-  }
-
-  const IPAddress ip = WiFi.softAPIP();
-  if (ip == IPAddress((uint32_t)0)) {
-    Serial.println("Wi-Fi softAP has no IP");
-    ui_set_status_message("Wi-Fi Error", "AP has no IP");
-    return;
-  }
-
-  String url = "http://" + ip.toString() + "/";
 
   server.on("/", HTTP_GET, handleRoot);
   server.on("/beep", HTTP_POST, handleBeep);
+  server.on("/connect", HTTP_POST, handleConnect);
+  server.on("/forget", HTTP_POST, handleForget);
   server.begin();
-
-  ui_set_network_info(kAccessPointSsid, url.c_str());
-
-  Serial.printf("Wi-Fi AP started: %s\n", kAccessPointSsid);
-  Serial.printf("Wi-Fi URL: %s\n", url.c_str());
 }
 
 void wifi_config_loop() {
   server.handleClient();
+  process_pending_forget();
 }

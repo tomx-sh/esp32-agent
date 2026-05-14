@@ -57,3 +57,17 @@ void ui_set_status_message(const char *title, const char *message) {
     lv_label_set_text(urlLabel, "");
   }
 }
+
+void ui_set_connection_overview(const char *headline, const char *details) {
+  if (titleLabel != nullptr) {
+    lv_label_set_text(titleLabel, "Wi-Fi Status");
+  }
+
+  if (ssidLabel != nullptr) {
+    lv_label_set_text(ssidLabel, headline);
+  }
+
+  if (urlLabel != nullptr) {
+    lv_label_set_text(urlLabel, details);
+  }
+}
