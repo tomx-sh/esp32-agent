@@ -31,11 +31,11 @@ void refresh_ui() {
 
   if (stationConnected) {
     headline = "WiFi:\nConnected to " + stationSsid;
-    details = "Dashboard:\nhttp://" + WiFi.localIP().toString() + "/";
+    details = "\nDashboard:\nhttp://" + WiFi.localIP().toString() + "/";
 
     if (apActive) {
-      headline += "\n\nHotspot:\n" + String(kAccessPointSsid);
-      details += "\n\nPassword:\n" + String(kAccessPointPassword) +
+      details += "\n\nHotspot:\n" + String(kAccessPointSsid) +
+                 "\nPassword:\n" + String(kAccessPointPassword) +
                  "\nDashboard:\nhttp://" + WiFi.softAPIP().toString() + "/";
     }
   } else if (apActive) {
