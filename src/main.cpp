@@ -3,6 +3,7 @@
 #include <display/Arduino_SH8601.h>
 #include <lvgl.h>
 
+#include "audio/audio.h"
 #include "pin_config.h"
 #include "ui/ui.h"
 #include "wifi_config/wifi_config.h"
@@ -67,6 +68,7 @@ void setup() {
       sizeof(drawBuffer),
       LV_DISPLAY_RENDER_MODE_PARTIAL);
 
+  audio_play_startup_beep();
   ui_create();
   wifi_config_init();
 
