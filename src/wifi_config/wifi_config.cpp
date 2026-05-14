@@ -5,6 +5,7 @@
 
 #include "audio/audio.h"
 #include "ui/ui.h"
+#include "web/config_page.h"
 
 namespace {
 constexpr char kAccessPointSsid[] = "ESP32-AMOLED-Setup";
@@ -91,47 +92,7 @@ bool start_access_point() {
 
 void handleRoot() {
   const String baseUrl = "http://" + server.hostHeader();
-
-  String html =
-      "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" "
-      "content=\"width=device-width, initial-scale=1\"><title>ESP32 Config</title>"
-      "</head><body><h1>ESP32 Config</h1><p>Device is online.</p>"
-      "<p id=\"wifi-status\">Router status: " +
-      stationStatus +
-      "</p>"
-      "<form id=\"wifi-form\"><label for=\"ssid\">Router SSID</label>"
-      "<input id=\"ssid\" name=\"ssid\" autocomplete=\"off\" required>"
-      "<label for=\"password\">Router password</label>"
-      "<input id=\"password\" name=\"password\" type=\"password\">"
-      "<p><button type=\"submit\">Connect to router</button></p></form>"
-      "<p><button id=\"forget\" type=\"button\">Forget WiFi</button></p>"
-      "<button id=\"beep\">Play beep</button><p id=\"status\"></p>"
-      "<p>Programmatic trigger:</p><code>curl -X POST " +
-      baseUrl +
-      "/beep</code>"
-      "<script>const button=document.getElementById('beep');"
-      "const forget=document.getElementById('forget');"
-      "const form=document.getElementById('wifi-form');"
-      "const status=document.getElementById('status');"
-      "const wifiStatus=document.getElementById('wifi-status');"
-      "form.addEventListener('submit',async(e)=>{e.preventDefault();"
-      "const formData=new FormData(form);status.textContent='Connecting to router...';"
-      "try{const response=await fetch('/connect',{method:'POST',body:new URLSearchParams(formData)});"
-      "const text=await response.text();status.textContent=text;"
-      "wifiStatus.textContent='Router status: '+text;}"
-      "catch(e){status.textContent='Connection request failed';}});"
-      "button.addEventListener('click',async()=>{button.disabled=true;status.textContent='Playing...';"
-      "try{const response=await fetch('/beep',{method:'POST'});"
-      "status.textContent=response.ok?'Beep played':'Beep failed';}"
-      "catch(e){status.textContent='Request failed';}"
-      "button.disabled=false;});"
-      "forget.addEventListener('click',async()=>{forget.disabled=true;status.textContent='Forgetting WiFi...';"
-      "try{const response=await fetch('/forget',{method:'POST'});"
-      "const text=await response.text();status.textContent=text;wifiStatus.textContent='Router status: '+text;}"
-      "catch(e){status.textContent='Forget request failed';forget.disabled=false;}});"
-      "</script></body></html>";
-
-  server.send(200, "text/html", html);
+  server.send(200, "text/html", render_config_page(stationStatus, baseUrl));
 }
 
 void handleBeep() {

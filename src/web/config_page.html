@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ESP32 Config</title>
+  </head>
+  <body>
+    <h1>ESP32 Config</h1>
+    <p>Device is online.</p>
+
+    <p id="wifi-status">Router status: {{STATION_STATUS}}</p>
+
+    <form id="wifi-form">
+      <label for="ssid">Router SSID</label>
+      <input id="ssid" name="ssid" autocomplete="off" required>
+        <br/>
+      <label for="password">Router password</label>
+      <input id="password" name="password" type="password">
+
+      <p><button type="submit">Connect to router</button></p>
+    </form>
+
+    <p><button id="forget" type="button">Forget WiFi</button></p>
+    <button id="beep">Play beep</button>
+    <p id="status"></p>
+
+    <p>Programmatic trigger:</p>
+    <code>curl -X POST {{BASE_URL}}/beep</code>
+
+    <script>
+      const button = document.getElementById('beep');
+      const forget = document.getElementById('forget');
+      const form = document.getElementById('wifi-form');
+      const status = document.getElementById('status');
+      const wifiStatus = document.getElementById('wifi-status');
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(form);
+        status.textContent = 'Connecting to router...';
+
+        try {
+          const response = await fetch('/connect', {
+            method: 'POST',
+            body: new URLSearchParams(formData),
+          });
+          const text = await response.text();
+
+          status.textContent = text;
+          wifiStatus.textContent = 'Router status: ' + text;
+        } catch (error) {
+          status.textContent = 'Connection request failed';
+        }
+      });
+
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        status.textContent = 'Playing...';
+
+        try {
+          const response = await fetch('/beep', { method: 'POST' });
+          status.textContent = response.ok ? 'Beep played' : 'Beep failed';
+        } catch (error) {
+          status.textContent = 'Request failed';
+        }
+
+        button.disabled = false;
+      });
+
+      forget.addEventListener('click', async () => {
+        forget.disabled = true;
+        status.textContent = 'Forgetting WiFi...';
+
+        try {
+          const response = await fetch('/forget', { method: 'POST' });
+          const text = await response.text();
+
+          status.textContent = text;
+          wifiStatus.textContent = 'Router status: ' + text;
+        } catch (error) {
+          status.textContent = 'Forget request failed';
+          forget.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
