@@ -1,0 +1,7 @@
+interface:
+  display_name: "ESP32 USB Flash"
+  short_description: "Flash ESP32-S3 firmware over USB."
+  default_prompt: "Use $esp32-usb-flash to flash the ESP32-S3 over USB and troubleshoot serial port detection."
+
+policy:
+  allow_implicit_invocation: true

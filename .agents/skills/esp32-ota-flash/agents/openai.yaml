@@ -1,0 +1,7 @@
+interface:
+  display_name: "ESP32 OTA Flash"
+  short_description: "Flash ESP32-S3 firmware over Wi-Fi."
+  default_prompt: "Use $esp32-ota-flash to flash the ESP32-S3 over OTA and troubleshoot upload failures."
+
+policy:
+  allow_implicit_invocation: true
