@@ -4,6 +4,7 @@
 #include <lvgl.h>
 
 #include "audio/audio.h"
+#include "ota_update/ota_update.h"
 #include "pin_config.h"
 #include "ui/ui.h"
 #include "wifi_config/wifi_config.h"
@@ -71,6 +72,7 @@ void setup() {
   audio_play_beep();
   ui_create();
   wifi_config_init();
+  ota_update_init();
 
   Serial.println("Display ready");
 }
@@ -83,5 +85,6 @@ void loop() {
 
   lv_timer_handler();
   wifi_config_loop();
+  ota_update_loop();
   delay(kLvglTickMs);
 }
