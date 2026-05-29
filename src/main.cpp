@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <databus/Arduino_ESP32QSPI.h>
 #include <display/Arduino_SH8601.h>
+#include <draw/sw/lv_draw_sw_utils.h>
 #include <lvgl.h>
 
 #include "audio/audio.h"
@@ -12,6 +13,7 @@
 namespace {
 constexpr uint32_t kLvglTickMs = 5;
 constexpr uint32_t kDrawBufferLines = 40;
+constexpr lv_display_rotation_t kDisplayRotation = LV_DISPLAY_ROTATION_90;
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
     LCD_CS,
@@ -30,15 +32,43 @@ Arduino_SH8601 *gfx = new Arduino_SH8601(
 
 lv_display_t *display = nullptr;
 lv_color_t drawBuffer[LCD_WIDTH * kDrawBufferLines];
+lv_color_t rotatedDrawBuffer[LCD_WIDTH * kDrawBufferLines];
 
 void flushDisplay(lv_display_t *disp, const lv_area_t *area, uint8_t *pxMap) {
-  const uint32_t width = area->x2 - area->x1 + 1;
-  const uint32_t height = area->y2 - area->y1 + 1;
+  lv_area_t targetArea = *area;
+  uint8_t *targetPxMap = pxMap;
+
+  const lv_display_rotation_t rotation = lv_display_get_rotation(disp);
+  if (rotation != LV_DISPLAY_ROTATION_0) {
+    const lv_color_format_t colorFormat = lv_display_get_color_format(disp);
+    const int32_t sourceWidth = lv_area_get_width(area);
+    const int32_t sourceHeight = lv_area_get_height(area);
+    const uint32_t sourceStride = lv_draw_buf_width_to_stride(sourceWidth, colorFormat);
+
+    lv_display_rotate_area(disp, &targetArea);
+    const uint32_t targetStride =
+        lv_draw_buf_width_to_stride(lv_area_get_width(&targetArea), colorFormat);
+
+    lv_draw_sw_rotate(
+        pxMap,
+        rotatedDrawBuffer,
+        sourceWidth,
+        sourceHeight,
+        sourceStride,
+        targetStride,
+        rotation,
+        colorFormat);
+
+    targetPxMap = reinterpret_cast<uint8_t *>(rotatedDrawBuffer);
+  }
+
+  const uint32_t width = lv_area_get_width(&targetArea);
+  const uint32_t height = lv_area_get_height(&targetArea);
 
   gfx->draw16bitRGBBitmap(
-      area->x1,
-      area->y1,
-      reinterpret_cast<uint16_t *>(pxMap),
+      targetArea.x1,
+      targetArea.y1,
+      reinterpret_cast<uint16_t *>(targetPxMap),
       width,
       height);
 
@@ -68,6 +98,7 @@ void setup() {
       nullptr,
       sizeof(drawBuffer),
       LV_DISPLAY_RENDER_MODE_PARTIAL);
+  lv_display_set_rotation(display, kDisplayRotation);
 
   audio_play_beep();
   ui_create();
