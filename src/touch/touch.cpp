@@ -7,32 +7,59 @@
 
 namespace {
 constexpr uint8_t kFt3168Address = 0x38;
-constexpr uint8_t kTouchDataRegister = 0x02;
-constexpr uint8_t kTouchCountMask = 0x0F;
+constexpr uint8_t kFingerCountRegister = 0x02;
+constexpr uint8_t kTouchXHighRegister = 0x03;
+constexpr uint8_t kTouchXLowRegister = 0x04;
+constexpr uint8_t kTouchYHighRegister = 0x05;
+constexpr uint8_t kTouchYLowRegister = 0x06;
+constexpr uint8_t kPowerModeRegister = 0xA5;
+constexpr uint8_t kPowerActiveMode = 0x00;
 constexpr uint8_t kCoordinateHighMask = 0x0F;
 
 lv_point_t lastTouchPoint = {0, 0};
 lv_indev_t *touchInput = nullptr;
 
-bool read_touch_point(lv_point_t *point) {
+bool read_register(uint8_t reg, uint8_t *value) {
   Wire.beginTransmission(kFt3168Address);
-  Wire.write(kTouchDataRegister);
-  if (Wire.endTransmission(false) != 0) {
+  Wire.write(reg);
+  if (Wire.endTransmission() != 0) {
     return false;
   }
 
-  constexpr uint8_t kBytesToRead = 5;
-  if (Wire.requestFrom(kFt3168Address, kBytesToRead) != kBytesToRead) {
+  if (Wire.requestFrom(kFt3168Address, static_cast<uint8_t>(1)) != 1) {
     return false;
   }
 
-  const uint8_t touchCount = Wire.read() & kTouchCountMask;
-  const uint8_t xHigh = Wire.read();
-  const uint8_t xLow = Wire.read();
-  const uint8_t yHigh = Wire.read();
-  const uint8_t yLow = Wire.read();
+  *value = Wire.read();
+  return true;
+}
+
+bool write_register(uint8_t reg, uint8_t value) {
+  Wire.beginTransmission(kFt3168Address);
+  Wire.write(reg);
+  Wire.write(value);
+  return Wire.endTransmission() == 0;
+}
+
+bool read_touch_point(lv_point_t *point) {
+  uint8_t touchCount = 0;
+  uint8_t xHigh = 0;
+  uint8_t xLow = 0;
+  uint8_t yHigh = 0;
+  uint8_t yLow = 0;
+
+  if (!read_register(kFingerCountRegister, &touchCount)) {
+    return false;
+  }
 
   if (touchCount == 0) {
+    return false;
+  }
+
+  if (!read_register(kTouchXHighRegister, &xHigh) ||
+      !read_register(kTouchXLowRegister, &xLow) ||
+      !read_register(kTouchYHighRegister, &yHigh) ||
+      !read_register(kTouchYLowRegister, &yLow)) {
     return false;
   }
 
@@ -61,6 +88,8 @@ void touch_init(lv_display_t *display) {
 #ifdef TOUCH_INT
   pinMode(TOUCH_INT, INPUT_PULLUP);
 #endif
+
+  write_register(kPowerModeRegister, kPowerActiveMode);
 
   touchInput = lv_indev_create();
   lv_indev_set_type(touchInput, LV_INDEV_TYPE_POINTER);
