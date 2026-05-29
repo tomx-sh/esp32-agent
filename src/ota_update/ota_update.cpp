@@ -8,7 +8,7 @@
 #include "ui/ui.h"
 
 namespace {
-constexpr char kOtaHostname[] = "esp32-claude-monitor";
+constexpr char kOtaHostname[] = "esp32-agent";
 constexpr uint16_t kOtaPort = 3232;
 
 #ifndef OTA_PASSWORD

@@ -1,6 +1,6 @@
 ---
 name: esp32-ota-flash
-description: Use when flashing this ESP32 Claude Monitor firmware over Wi-Fi with PlatformIO OTA, validating the build, or diagnosing basic OTA upload failures for this repository.
+description: Use when flashing this ESP32 Agent firmware over Wi-Fi with PlatformIO OTA, validating the build, or diagnosing basic OTA upload failures for this repository.
 ---
 
 # ESP32 OTA Flash
@@ -36,7 +36,7 @@ Successful upload ends with PlatformIO reporting `Result attempt 1: 'OK'` and `S
 Default OTA target:
 
 ```ini
-upload_port = esp32-claude-monitor.local
+upload_port = esp32-agent.local
 upload_flags =
   --port=3232
 ```

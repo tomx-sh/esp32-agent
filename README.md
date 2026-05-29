@@ -1,6 +1,6 @@
-# ESP32 Claude Monitor
+# ESP32 Agent
 
-Voice-enabled AI monitor for the ESP32-S3. Features an LVGL display UI, BLE connectivity, ES8311 audio with the Claude MCP server, and a web-based WiFi configuration interface. Built with PlatformIO and Arduino framework.
+Voice-enabled AI agent device for the ESP32-S3. Features an LVGL display UI, BLE connectivity, ES8311 audio with an agent backend, and a web-based WiFi configuration interface. Built with PlatformIO and Arduino framework.
 
 ## OTA flashing
 
@@ -16,4 +16,4 @@ After the device is running this firmware and connected to Wi-Fi, upload OTA wit
 pio run -e esp32-s3-devkitc-1-ota -t upload
 ```
 
-The OTA target uses `esp32-claude-monitor.local:3232`. If mDNS does not resolve on your network, replace `upload_port` in `platformio.ini` with the IP shown on the device display.
+The OTA target uses `esp32-agent.local:3232`. If mDNS does not resolve on your network, replace `upload_port` in `platformio.ini` with the IP shown on the device display.
