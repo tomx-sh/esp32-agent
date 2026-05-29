@@ -11,6 +11,7 @@
 
 #define IIC_SDA 15
 #define IIC_SCL 14
+#define TOUCH_INT 21
 
 #define I2S_MCK_IO 16
 #define I2S_BCK_IO 9

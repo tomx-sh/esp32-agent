@@ -7,6 +7,7 @@
 #include "audio/audio.h"
 #include "ota_update/ota_update.h"
 #include "pin_config.h"
+#include "touch/touch.h"
 #include "ui/ui.h"
 #include "wifi_config/wifi_config.h"
 
@@ -100,6 +101,7 @@ void setup() {
       LV_DISPLAY_RENDER_MODE_PARTIAL);
   lv_display_set_rotation(display, kDisplayRotation);
 
+  touch_init(display);
   audio_play_beep();
   ui_create();
   wifi_config_init();
