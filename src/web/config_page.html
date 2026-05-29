@@ -35,6 +35,14 @@
       const status = document.getElementById('status');
       const wifiStatus = document.getElementById('wifi-status');
 
+      async function refreshStatus() {
+        const response = await fetch('/status');
+        const text = await response.text();
+        wifiStatus.textContent = 'Router status: ' + text;
+        status.textContent = text;
+        return text;
+      }
+
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
 
@@ -50,6 +58,17 @@
 
           status.textContent = text;
           wifiStatus.textContent = 'Router status: ' + text;
+
+          if (response.status === 202) {
+            const startedAt = Date.now();
+            while (Date.now() - startedAt < 12000) {
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+              const latest = await refreshStatus();
+              if (!latest.startsWith('Connecting to ')) {
+                break;
+              }
+            }
+          }
         } catch (error) {
           status.textContent = 'Connection request failed';
         }

@@ -2,6 +2,7 @@
 #include <databus/Arduino_ESP32QSPI.h>
 #include <display/Arduino_SH8601.h>
 #include <draw/sw/lv_draw_sw_utils.h>
+#include <esp_heap_caps.h>
 #include <lvgl.h>
 
 #include "audio/audio.h"
@@ -32,8 +33,24 @@ Arduino_SH8601 *gfx = new Arduino_SH8601(
     LCD_HEIGHT);
 
 lv_display_t *display = nullptr;
-lv_color_t drawBuffer[LCD_WIDTH * kDrawBufferLines];
-lv_color_t rotatedDrawBuffer[LCD_WIDTH * kDrawBufferLines];
+lv_color_t *drawBuffer = nullptr;
+lv_color_t *rotatedDrawBuffer = nullptr;
+
+lv_color_t *allocateDrawBuffer(const char *name) {
+  constexpr size_t bufferBytes = LCD_WIDTH * kDrawBufferLines * sizeof(lv_color_t);
+  void *buffer = heap_caps_malloc(bufferBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (buffer == nullptr) {
+    buffer = heap_caps_malloc(bufferBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  }
+
+  if (buffer == nullptr) {
+    Serial.printf("LVGL %s buffer allocation failed (%zu bytes)\n", name, bufferBytes);
+    return nullptr;
+  }
+
+  Serial.printf("LVGL %s buffer allocated: %zu bytes\n", name, bufferBytes);
+  return static_cast<lv_color_t *>(buffer);
+}
 
 void flushDisplay(lv_display_t *disp, const lv_area_t *area, uint8_t *pxMap) {
   lv_area_t targetArea = *area;
@@ -90,6 +107,13 @@ void setup() {
   gfx->setBrightness(180);
   gfx->fillScreen(RGB565_BLACK);
 
+  drawBuffer = allocateDrawBuffer("draw");
+  rotatedDrawBuffer = allocateDrawBuffer("rotation");
+  if (drawBuffer == nullptr || rotatedDrawBuffer == nullptr) {
+    Serial.println("Display buffer init failed");
+    return;
+  }
+
   lv_init();
   display = lv_display_create(LCD_WIDTH, LCD_HEIGHT);
   lv_display_set_flush_cb(display, flushDisplay);
@@ -97,7 +121,7 @@ void setup() {
       display,
       drawBuffer,
       nullptr,
-      sizeof(drawBuffer),
+      LCD_WIDTH * kDrawBufferLines * sizeof(lv_color_t),
       LV_DISPLAY_RENDER_MODE_PARTIAL);
   lv_display_set_rotation(display, kDisplayRotation);
 

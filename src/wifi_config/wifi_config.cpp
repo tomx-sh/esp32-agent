@@ -22,6 +22,8 @@ String stationSsid = "";
 bool accessPointEnabled = false;
 bool forgetWifiPending = false;
 unsigned long forgetWifiAtMs = 0;
+bool stationConnectPending = false;
+unsigned long stationConnectStartedMs = 0;
 
 void refresh_ui() {
   const bool stationConnected = WiFi.status() == WL_CONNECTED;
@@ -92,7 +94,15 @@ bool start_access_point() {
 
 void handleRoot() {
   const String baseUrl = "http://" + server.hostHeader();
+  Serial.printf(
+      "HTTP GET / from %s, heap=%u\n",
+      server.client().remoteIP().toString().c_str(),
+      ESP.getFreeHeap());
   server.send(200, "text/html", render_config_page(stationStatus, baseUrl));
+}
+
+void handleStatus() {
+  server.send(200, "text/plain", stationStatus);
 }
 
 void handleBeep() {
@@ -113,32 +123,51 @@ void handleConnect() {
   const String ssid = server.arg("ssid");
   const String password = server.arg("password");
 
+  stationSsid = ssid;
+  stationStatus = "Connecting to " + ssid;
+  stationConnectPending = true;
+  stationConnectStartedMs = millis();
+  refresh_ui();
+
   WiFi.mode(WIFI_AP_STA);
   WiFi.persistent(true);
   WiFi.disconnect(false, true);
   WiFi.begin(ssid.c_str(), password.c_str());
 
-  if (connect_station()) {
-    stationSsid = ssid;
-    stationStatus = "Connected to " + ssid + " (" + WiFi.localIP().toString() + ")";
-    refresh_ui();
-    Serial.printf("Wi-Fi STA connected: %s\n", stationStatus.c_str());
-    server.send(200, "text/plain", stationStatus);
-    return;
-  }
-
-  stationStatus = "Connection failed for " + ssid;
-  refresh_ui();
-  Serial.printf("Wi-Fi STA connection failed: %s\n", ssid.c_str());
-  server.send(500, "text/plain", stationStatus);
+  Serial.printf("Wi-Fi STA connection started: %s\n", ssid.c_str());
+  server.send(202, "text/plain", stationStatus);
 }
 
 void handleForget() {
   stationStatus = "Forgetting saved WiFi credentials";
   stationSsid = "";
+  stationConnectPending = false;
   forgetWifiPending = true;
   forgetWifiAtMs = millis() + kForgetDelayMs;
   server.send(200, "text/plain", stationStatus);
+}
+
+void process_pending_station_connect() {
+  if (!stationConnectPending) {
+    return;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    stationConnectPending = false;
+    stationStatus = "Connected to " + stationSsid + " (" + WiFi.localIP().toString() + ")";
+    refresh_ui();
+    Serial.printf("Wi-Fi STA connected: %s\n", stationStatus.c_str());
+    return;
+  }
+
+  if (millis() - stationConnectStartedMs < kStationConnectTimeoutMs) {
+    return;
+  }
+
+  stationConnectPending = false;
+  stationStatus = "Connection failed for " + stationSsid;
+  refresh_ui();
+  Serial.printf("Wi-Fi STA connection failed: %s\n", stationSsid.c_str());
 }
 
 void process_pending_forget() {
@@ -178,13 +207,18 @@ void wifi_config_init() {
   }
 
   server.on("/", HTTP_GET, handleRoot);
+  server.on("/status", HTTP_GET, handleStatus);
   server.on("/beep", HTTP_POST, handleBeep);
   server.on("/connect", HTTP_POST, handleConnect);
   server.on("/forget", HTTP_POST, handleForget);
+  server.on("/favicon.ico", HTTP_GET, []() {
+    server.send(204);
+  });
   server.begin();
 }
 
 void wifi_config_loop() {
   server.handleClient();
+  process_pending_station_connect();
   process_pending_forget();
 }
