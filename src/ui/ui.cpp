@@ -20,7 +20,6 @@ char petSpritePath[96] = "";
 char petSpriteName[40] = "";
 
 constexpr size_t kPetPageIndex = 1;
-constexpr lv_color_format_t kPetGifColorFormat = LV_COLOR_FORMAT_RGB565;
 
 void configureLabel(lv_obj_t *label, const lv_font_t *font, lv_text_align_t align) {
   lv_obj_set_width(label, lv_pct(100));
@@ -64,7 +63,6 @@ lv_obj_t *ensurePetGif() {
   lv_obj_set_size(petGif, lv_pct(100), lv_pct(100));
   lv_image_set_inner_align(petGif, LV_IMAGE_ALIGN_CENTER);
   lv_image_set_antialias(petGif, false);
-  lv_gif_set_color_format(petGif, kPetGifColorFormat);
   lv_gif_set_auto_pause_invisible(petGif, true);
   lv_obj_add_flag(petGif, LV_OBJ_FLAG_HIDDEN);
   debug_log_heap("pet-gif-create-after");
@@ -104,10 +102,9 @@ bool loadPendingPetSprite() {
   debug_log_heap("pet-gif-set-src-before");
 #if APP_DEBUG_GRAPHICS
   Serial.printf(
-      "[debug][gif] set_src name=%s path=%s format=%d\n",
+      "[debug][gif] set_src name=%s path=%s\n",
       petSpriteName,
-      petSpritePath,
-      static_cast<int>(kPetGifColorFormat));
+      petSpritePath);
 #endif
   lv_gif_set_src(gif, petSpritePath);
   debug_log_heap("pet-gif-set-src-after");
