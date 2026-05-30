@@ -1,0 +1,7 @@
+interface:
+  display_name: "Codex Pet GIFs"
+  short_description: "Extract built-in Codex pet atlases and generate state GIFs."
+  default_prompt: "Use $codex-pet-gifs to find a built-in Codex pet spritesheet and convert it into one GIF per state."
+
+policy:
+  allow_implicit_invocation: true
