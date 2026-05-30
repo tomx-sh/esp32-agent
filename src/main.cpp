@@ -6,6 +6,7 @@
 #include <lvgl.h>
 
 #include "audio/audio.h"
+#include "debug/debug_log.h"
 #include "ota_update/ota_update.h"
 #include "pin_config.h"
 #include "touch/touch.h"
@@ -38,9 +39,9 @@ lv_color_t *rotatedDrawBuffer = nullptr;
 
 lv_color_t *allocateDrawBuffer(const char *name) {
   constexpr size_t bufferBytes = LCD_WIDTH * kDrawBufferLines * sizeof(lv_color_t);
-  void *buffer = heap_caps_malloc(bufferBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  void *buffer = heap_caps_malloc(bufferBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   if (buffer == nullptr) {
-    buffer = heap_caps_malloc(bufferBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    buffer = heap_caps_malloc(bufferBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   }
 
   if (buffer == nullptr) {
@@ -53,6 +54,29 @@ lv_color_t *allocateDrawBuffer(const char *name) {
 }
 
 void flushDisplay(lv_display_t *disp, const lv_area_t *area, uint8_t *pxMap) {
+#if APP_DEBUG_FLUSH
+  static uint32_t flushCount = 0;
+  static uint32_t lastFlushLogMs = 0;
+  const uint32_t nowMs = millis();
+  const bool logFlush = flushCount < 20 || nowMs - lastFlushLogMs > 5000;
+  if (logFlush) {
+    Serial.printf(
+        "[debug][flush] #%u area=(%ld,%ld)-(%ld,%ld) size=%ldx%ld cf=%d rot=%d px=%p\n",
+        static_cast<unsigned>(flushCount),
+        static_cast<long>(area->x1),
+        static_cast<long>(area->y1),
+        static_cast<long>(area->x2),
+        static_cast<long>(area->y2),
+        static_cast<long>(lv_area_get_width(area)),
+        static_cast<long>(lv_area_get_height(area)),
+        static_cast<int>(lv_display_get_color_format(disp)),
+        static_cast<int>(lv_display_get_rotation(disp)),
+        pxMap);
+    lastFlushLogMs = nowMs;
+  }
+  ++flushCount;
+#endif
+
   lv_area_t targetArea = *area;
   uint8_t *targetPxMap = pxMap;
 
@@ -98,6 +122,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("Starting LVGL display hello world");
+  debug_log_heap("boot-start");
   Serial.printf(
       "Heap: internal=%u, psram=%u/%u, largest_psram=%u\n",
       heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
@@ -112,6 +137,7 @@ void setup() {
 
   gfx->setBrightness(180);
   gfx->fillScreen(RGB565_BLACK);
+  debug_log_heap("display-begin");
 
   drawBuffer = allocateDrawBuffer("draw");
   rotatedDrawBuffer = allocateDrawBuffer("rotation");
@@ -121,6 +147,7 @@ void setup() {
   }
 
   lv_init();
+  debug_log_heap("lv-init");
   display = lv_display_create(LCD_WIDTH, LCD_HEIGHT);
   lv_display_set_flush_cb(display, flushDisplay);
   lv_display_set_buffers(
@@ -132,9 +159,13 @@ void setup() {
   lv_display_set_rotation(display, kDisplayRotation);
 
   touch_init(display);
+  debug_log_heap("touch-init");
   audio_play_beep();
+  debug_log_heap("audio-beep");
   ui_create();
+  debug_log_heap("ui-create");
   wifi_config_init();
+  debug_log_heap("wifi-config-init");
   ota_update_init();
 
   Serial.println("Display ready");

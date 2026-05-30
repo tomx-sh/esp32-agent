@@ -8,6 +8,7 @@
 #include <lvgl.h>
 
 #include "audio/audio.h"
+#include "debug/debug_log.h"
 #include "ui/ui.h"
 #include "web/config_page.h"
 
@@ -188,6 +189,7 @@ bool show_pet_sprite(const String &name, unsigned long ttlMs, String &error) {
     return false;
   }
 
+  debug_log_heap("sprite-show-before-size");
   uint16_t width = 0;
   uint16_t height = 0;
   const size_t fileSize = LittleFS.open(filePath, FILE_READ).size();
@@ -217,6 +219,7 @@ bool show_pet_sprite(const String &name, unsigned long ttlMs, String &error) {
         heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     return false;
   }
+  debug_log_heap("sprite-show-after-ui");
 
   if (ttlMs > 0) {
     temporarySpritePreviousName = activeSpriteName;

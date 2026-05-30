@@ -4,6 +4,7 @@
 
 #include <lvgl.h>
 
+#include "debug/debug_log.h"
 #include "page_view.h"
 
 namespace {
@@ -19,6 +20,7 @@ char petSpritePath[96] = "";
 char petSpriteName[40] = "";
 
 constexpr size_t kPetPageIndex = 1;
+constexpr lv_color_format_t kPetGifColorFormat = LV_COLOR_FORMAT_RGB565;
 
 void configureLabel(lv_obj_t *label, const lv_font_t *font, lv_text_align_t align) {
   lv_obj_set_width(label, lv_pct(100));
@@ -57,23 +59,36 @@ lv_obj_t *ensurePetGif() {
     return petGif;
   }
 
+  debug_log_heap("pet-gif-create-before");
   petGif = lv_gif_create(petContent);
   lv_obj_set_size(petGif, lv_pct(100), lv_pct(100));
   lv_image_set_inner_align(petGif, LV_IMAGE_ALIGN_CENTER);
   lv_image_set_antialias(petGif, false);
-  lv_gif_set_color_format(petGif, LV_COLOR_FORMAT_ARGB8888);
+  lv_gif_set_color_format(petGif, kPetGifColorFormat);
   lv_gif_set_auto_pause_invisible(petGif, true);
   lv_obj_add_flag(petGif, LV_OBJ_FLAG_HIDDEN);
+  debug_log_heap("pet-gif-create-after");
   return petGif;
 }
 
-void unloadPetGif() {
+void hidePetGif() {
   if (petGif == nullptr) {
     return;
   }
 
+  lv_gif_pause(petGif);
+  lv_obj_add_flag(petGif, LV_OBJ_FLAG_HIDDEN);
+}
+
+void deletePetGif() {
+  if (petGif == nullptr) {
+    return;
+  }
+
+  debug_log_heap("pet-gif-delete-before");
   lv_obj_delete(petGif);
   petGif = nullptr;
+  debug_log_heap("pet-gif-delete-after");
 }
 
 bool loadPendingPetSprite() {
@@ -86,7 +101,16 @@ bool loadPendingPetSprite() {
     return false;
   }
 
+  debug_log_heap("pet-gif-set-src-before");
+#if APP_DEBUG_GRAPHICS
+  Serial.printf(
+      "[debug][gif] set_src name=%s path=%s format=%d\n",
+      petSpriteName,
+      petSpritePath,
+      static_cast<int>(kPetGifColorFormat));
+#endif
   lv_gif_set_src(gif, petSpritePath);
+  debug_log_heap("pet-gif-set-src-after");
 
   if (!lv_gif_is_loaded(gif)) {
     lv_obj_add_flag(gif, LV_OBJ_FLAG_HIDDEN);
@@ -99,6 +123,15 @@ bool loadPendingPetSprite() {
   }
 
   applyPixelArtScale(gif, petSpritePath);
+  lv_gif_restart(gif);
+  lv_gif_resume(gif);
+#if APP_DEBUG_GRAPHICS
+  Serial.printf(
+      "[debug][gif] loaded path=%s frames=%ld current=%ld\n",
+      petSpritePath,
+      static_cast<long>(lv_gif_get_frame_count(gif)),
+      static_cast<long>(lv_gif_get_current_frame_index(gif)));
+#endif
   lv_obj_remove_flag(gif, LV_OBJ_FLAG_HIDDEN);
   lv_obj_align(gif, LV_ALIGN_CENTER, 0, 0);
   lv_obj_add_flag(petStatusLabel, LV_OBJ_FLAG_HIDDEN);
@@ -118,10 +151,13 @@ void updatePetPageActiveState() {
   }
 
   petPageActive = active;
+#if APP_DEBUG_GRAPHICS
+  Serial.printf("[debug][tile] pet_active=%d active_index=%ld\n", petPageActive, static_cast<long>(activeTile == nullptr ? -1 : lv_obj_get_index(activeTile)));
+#endif
   if (petPageActive) {
     loadPendingPetSprite();
   } else {
-    unloadPetGif();
+    hidePetGif();
   }
 }
 
@@ -182,6 +218,7 @@ void buildPetPage(lv_obj_t *parent) {
   lv_obj_remove_style_all(petContent);
   lv_obj_remove_flag(petContent, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_size(petContent, lv_pct(100), lv_pct(100));
+  ensurePetGif();
 
   petStatusLabel = lv_label_create(petContent);
   lv_label_set_text(petStatusLabel, "No pet sprite loaded");
@@ -254,14 +291,13 @@ bool ui_show_pet_sprite(const char *name, const char *lvglPath) {
     return true;
   }
 
-  unloadPetGif();
   return loadPendingPetSprite();
 }
 
 void ui_clear_pet_sprite(const char *message) {
   petSpritePath[0] = '\0';
   petSpriteName[0] = '\0';
-  unloadPetGif();
+  hidePetGif();
 
   if (petStatusLabel != nullptr) {
     lv_label_set_text(petStatusLabel, message == nullptr ? "No pet sprite loaded" : message);
