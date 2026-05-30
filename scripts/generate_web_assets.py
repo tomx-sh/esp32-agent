@@ -48,10 +48,7 @@ def c_identifier(name):
 
 
 def sprite_name_from_file(path):
-    stem = path.stem
-    if stem.startswith("codex-"):
-        stem = stem[len("codex-") :]
-    return stem
+    return path.stem
 
 
 def format_bytes(data):
