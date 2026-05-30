@@ -47,6 +47,8 @@
     <code>curl -X POST {{BASE_URL}}/beep</code>
     <br/>
     <code>curl -X POST {{BASE_URL}}/pet -H 'Content-Type: application/json' -d '{"name":"thinking","ttlMs":5000}'</code>
+    <br/>
+    <code>curl -X POST {{BASE_URL}}/pet/message -H 'Content-Type: application/json' -d '{"message":"Hello from Codex","ttlMs":5000}'</code>
 
     <script>
       const button = document.getElementById('beep');

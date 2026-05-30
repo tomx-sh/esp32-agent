@@ -6,6 +6,7 @@
 
 #include "debug/debug_log.h"
 #include "page_view.h"
+#include "pet_message.h"
 
 namespace {
 lv_obj_t *titleLabel = nullptr;
@@ -138,6 +139,7 @@ bool loadPendingPetSprite() {
   lv_obj_remove_flag(gif, LV_OBJ_FLAG_HIDDEN);
   lv_obj_align(gif, LV_ALIGN_CENTER, 0, 0);
   lv_obj_add_flag(petStatusLabel, LV_OBJ_FLAG_HIDDEN);
+  pet_message_init(petContent);
   return true;
 }
 
@@ -222,6 +224,7 @@ void buildPetPage(lv_obj_t *parent) {
   lv_obj_remove_flag(petContent, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_size(petContent, lv_pct(100), lv_pct(100));
   ensurePetGif();
+  pet_message_init(petContent);
 
   petStatusLabel = lv_label_create(petContent);
   lv_label_set_text(petStatusLabel, "No pet sprite loaded");
@@ -306,6 +309,14 @@ void ui_clear_pet_sprite(const char *message) {
     lv_label_set_text(petStatusLabel, message == nullptr ? "No pet sprite loaded" : message);
     lv_obj_remove_flag(petStatusLabel, LV_OBJ_FLAG_HIDDEN);
   }
+}
+
+bool ui_show_pet_message(const char *message) {
+  return pet_message_show(message);
+}
+
+void ui_clear_pet_message() {
+  pet_message_clear();
 }
 
 bool ui_is_pet_page_active() {

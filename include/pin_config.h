@@ -8,6 +8,7 @@
 #define LCD_CS 12
 #define LCD_WIDTH 368
 #define LCD_HEIGHT 448
+#define DISPLAY_CORNER_RADIUS_PX 56
 
 #define IIC_SDA 15
 #define IIC_SCL 14

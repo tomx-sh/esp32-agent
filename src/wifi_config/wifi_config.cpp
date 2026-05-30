@@ -24,6 +24,7 @@ constexpr unsigned long kForgetDelayMs = 1000;
 constexpr size_t kMaxSpriteUploadBytes = 512 * 1024;
 constexpr uint16_t kMaxSpriteWidth = 240;
 constexpr uint16_t kMaxSpriteHeight = 240;
+constexpr size_t kMaxPetMessageLength = 240;
 constexpr char kSpriteDir[] = "/sprites";
 constexpr char kSpriteUploadPath[] = "/sprites/.upload.gif";
 constexpr char kDefaultSpriteName[] = "idle";
@@ -46,6 +47,8 @@ String spriteUploadError = "";
 File spriteUploadFile;
 unsigned long petSpriteExpiresAtMs = 0;
 bool petSpriteExpires = false;
+unsigned long petMessageExpiresAtMs = 0;
+bool petMessageExpires = false;
 bool spriteStorageReady = false;
 bool defaultSpriteLoadPending = false;
 unsigned long defaultSpriteLoadAtMs = 0;
@@ -582,6 +585,44 @@ void handlePetCommand() {
   server.send(200, "text/plain", "Showing sprite: " + String(name));
 }
 
+void handlePetMessageCommand() {
+  JsonDocument doc;
+  DeserializationError jsonError = deserializeJson(doc, server.arg("plain"));
+  if (jsonError) {
+    server.send(400, "text/plain", "Invalid JSON");
+    return;
+  }
+
+  const char *message = doc["message"] | doc["text"] | "";
+  const unsigned long ttlMs = doc["ttlMs"] | 0;
+  const size_t messageLength = strlen(message);
+
+  if (messageLength == 0) {
+    server.send(400, "text/plain", "Missing message");
+    return;
+  }
+
+  if (messageLength > kMaxPetMessageLength) {
+    server.send(400, "text/plain", "Message is too long");
+    return;
+  }
+
+  if (!ui_show_pet_message(message)) {
+    server.send(500, "text/plain", "Could not show message");
+    return;
+  }
+
+  if (ttlMs > 0) {
+    petMessageExpiresAtMs = millis() + ttlMs;
+    petMessageExpires = true;
+  } else {
+    petMessageExpiresAtMs = 0;
+    petMessageExpires = false;
+  }
+
+  server.send(200, "text/plain", "Showing message");
+}
+
 void handleConnect() {
   if (!server.hasArg("ssid")) {
     server.send(400, "text/plain", "Missing ssid");
@@ -676,6 +717,16 @@ void process_pending_pet_expiry() {
   show_default_pet_sprite();
 }
 
+void process_pending_pet_message_expiry() {
+  if (!petMessageExpires || static_cast<long>(millis() - petMessageExpiresAtMs) < 0) {
+    return;
+  }
+
+  petMessageExpires = false;
+  petMessageExpiresAtMs = 0;
+  ui_clear_pet_message();
+}
+
 void process_pending_default_sprite_load() {
   if (!defaultSpriteLoadPending ||
       !ui_is_pet_page_active() ||
@@ -714,6 +765,7 @@ void wifi_config_init() {
   server.on("/sprites", HTTP_DELETE, handleSpriteDelete);
   server.on("/sprites/upload", HTTP_POST, handleSpriteUploadComplete, handleSpriteUploadData);
   server.on("/pet", HTTP_POST, handlePetCommand);
+  server.on("/pet/message", HTTP_POST, handlePetMessageCommand);
   server.on("/connect", HTTP_POST, handleConnect);
   server.on("/forget", HTTP_POST, handleForget);
   server.on("/favicon.ico", HTTP_GET, []() {
@@ -728,4 +780,5 @@ void wifi_config_loop() {
   process_pending_station_connect();
   process_pending_forget();
   process_pending_pet_expiry();
+  process_pending_pet_message_expiry();
 }
