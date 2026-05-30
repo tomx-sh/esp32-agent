@@ -1,10 +1,10 @@
 #include "audio.h"
 
 #include <ESP_I2S.h>
-#include <Wire.h>
 #include <math.h>
 
 #include "esp_err.h"
+#include "i2c_bus/i2c_bus.h"
 #include "pin_config.h"
 #include "official/es8311.h"
 
@@ -84,10 +84,14 @@ bool ensure_audio_ready() {
     return false;
   }
 
-  Wire.begin(IIC_SDA, IIC_SCL);
+  if (!i2c_bus_init()) {
+    Serial.println("Audio init failed: I2C init failed");
+    return false;
+  }
 
   const esp_err_t codecErr = codec_init();
   if (codecErr != ESP_OK) {
+    i2c_bus_recover();
     Serial.printf("Audio init failed: ES8311 error %d\n", static_cast<int>(codecErr));
     return false;
   }

@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+#include "i2c_bus/i2c_bus.h"
 #include "pin_config.h"
 
 namespace {
@@ -23,10 +24,12 @@ bool read_register(uint8_t reg, uint8_t *value) {
   Wire.beginTransmission(kFt3168Address);
   Wire.write(reg);
   if (Wire.endTransmission() != 0) {
+    i2c_bus_recover();
     return false;
   }
 
   if (Wire.requestFrom(kFt3168Address, static_cast<uint8_t>(1)) != 1) {
+    i2c_bus_recover();
     return false;
   }
 
@@ -38,10 +41,21 @@ bool write_register(uint8_t reg, uint8_t value) {
   Wire.beginTransmission(kFt3168Address);
   Wire.write(reg);
   Wire.write(value);
-  return Wire.endTransmission() == 0;
+  if (Wire.endTransmission() == 0) {
+    return true;
+  }
+
+  i2c_bus_recover();
+  return false;
 }
 
 bool read_touch_point(lv_point_t *point) {
+#ifdef TOUCH_INT
+  if (digitalRead(TOUCH_INT) == HIGH) {
+    return false;
+  }
+#endif
+
   uint8_t touchCount = 0;
   uint8_t xHigh = 0;
   uint8_t xLow = 0;
@@ -83,7 +97,9 @@ void read_touch(lv_indev_t *, lv_indev_data_t *data) {
 }  // namespace
 
 void touch_init(lv_display_t *display) {
-  Wire.begin(IIC_SDA, IIC_SCL);
+  if (!i2c_bus_init()) {
+    return;
+  }
 
 #ifdef TOUCH_INT
   pinMode(TOUCH_INT, INPUT_PULLUP);

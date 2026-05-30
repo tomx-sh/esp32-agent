@@ -45,6 +45,8 @@ File spriteUploadFile;
 unsigned long petSpriteExpiresAtMs = 0;
 bool petSpriteExpires = false;
 bool spriteStorageReady = false;
+bool defaultSpriteLoadPending = false;
+unsigned long defaultSpriteLoadAtMs = 0;
 
 void show_default_pet_sprite();
 
@@ -177,6 +179,8 @@ bool show_pet_sprite(const String &name, unsigned long ttlMs, String &error) {
     error = "Invalid sprite name";
     return false;
   }
+
+  defaultSpriteLoadPending = false;
 
   const String filePath = sprite_file_path(name);
   if (!LittleFS.exists(filePath)) {
@@ -630,11 +634,21 @@ void process_pending_pet_expiry() {
   temporarySpritePreviousName = "";
   show_default_pet_sprite();
 }
+
+void process_pending_default_sprite_load() {
+  if (!defaultSpriteLoadPending || static_cast<long>(millis() - defaultSpriteLoadAtMs) < 0) {
+    return;
+  }
+
+  defaultSpriteLoadPending = false;
+  show_default_pet_sprite();
+}
 }  // namespace
 
 void wifi_config_init() {
   init_sprite_storage();
-  show_default_pet_sprite();
+  defaultSpriteLoadPending = true;
+  defaultSpriteLoadAtMs = millis() + 250;
 
   WiFi.mode(WIFI_AP_STA);
   WiFi.persistent(true);
@@ -667,6 +681,7 @@ void wifi_config_init() {
 
 void wifi_config_loop() {
   server.handleClient();
+  process_pending_default_sprite_load();
   process_pending_station_connect();
   process_pending_forget();
   process_pending_pet_expiry();
