@@ -22,6 +22,30 @@ void configureLabel(lv_obj_t *label, const lv_font_t *font, lv_text_align_t alig
   lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
 }
 
+void applyPixelArtScale(lv_obj_t *gif, const char *lvglPath) {
+  uint16_t gifWidth = 0;
+  uint16_t gifHeight = 0;
+  if (!lv_gif_get_size(lvglPath, &gifWidth, &gifHeight) || gifWidth == 0 || gifHeight == 0) {
+    lv_image_set_scale(gif, LV_SCALE_NONE);
+    return;
+  }
+
+  lv_obj_t *container = lv_obj_get_parent(gif);
+  lv_obj_update_layout(container);
+
+  const int32_t availableWidth = lv_obj_get_width(container);
+  const int32_t availableHeight = lv_obj_get_height(container);
+  if (availableWidth <= 0 || availableHeight <= 0) {
+    lv_image_set_scale(gif, LV_SCALE_NONE);
+    return;
+  }
+
+  const int32_t scaleX = availableWidth / gifWidth;
+  const int32_t scaleY = availableHeight / gifHeight;
+  const int32_t integerScale = LV_MAX(1, LV_MIN(scaleX, scaleY));
+  lv_image_set_scale(gif, static_cast<uint32_t>(integerScale * LV_SCALE_NONE));
+}
+
 lv_obj_t *createPageContent(lv_obj_t *parent) {
   lv_obj_t *content = lv_obj_create(parent);
   lv_obj_remove_style_all(content);
@@ -78,7 +102,8 @@ void buildPetPage(lv_obj_t *parent) {
 
   petGif = lv_gif_create(content);
   lv_obj_set_size(petGif, lv_pct(100), lv_pct(100));
-  lv_image_set_inner_align(petGif, LV_IMAGE_ALIGN_CONTAIN);
+  lv_image_set_inner_align(petGif, LV_IMAGE_ALIGN_CENTER);
+  lv_image_set_antialias(petGif, false);
   lv_gif_set_color_format(petGif, LV_COLOR_FORMAT_RGB565);
   lv_gif_set_auto_pause_invisible(petGif, true);
   lv_obj_add_flag(petGif, LV_OBJ_FLAG_HIDDEN);
@@ -155,6 +180,7 @@ bool ui_show_pet_sprite(const char *name, const char *lvglPath) {
     return false;
   }
 
+  applyPixelArtScale(petGif, petSpritePath);
   lv_obj_remove_flag(petGif, LV_OBJ_FLAG_HIDDEN);
   lv_obj_align(petGif, LV_ALIGN_CENTER, 0, 0);
   lv_obj_add_flag(petStatusLabel, LV_OBJ_FLAG_HIDDEN);
