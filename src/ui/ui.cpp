@@ -19,7 +19,7 @@ bool petPageActive = false;
 char petSpritePath[96] = "";
 char petSpriteName[40] = "";
 
-constexpr size_t kPetPageIndex = 1;
+constexpr size_t kPetPageIndex = 0;
 
 void configureLabel(lv_obj_t *label, const lv_font_t *font, lv_text_align_t align) {
   lv_obj_set_width(label, lv_pct(100));
@@ -230,9 +230,9 @@ void buildPetPage(lv_obj_t *parent) {
 }
 
 constexpr UiPageDefinition kPages[] = {
-    {"Hello", buildHelloPage},
     {"Pet", buildPetPage},
     {"Wi-Fi", buildWifiConfigPage},
+    {"Hello", buildHelloPage},
 };
 }
 
