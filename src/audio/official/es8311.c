@@ -311,7 +311,6 @@ esp_err_t es8311_microphone_config(es8311_handle_t dev, bool digital_mic)
     if (digital_mic) {
         reg14 |= BIT(6);
     }
-    es8311_write_reg(dev, ES8311_ADC_REG17, 0xC8); // Set ADC gain @todo move this to ADC config section
 
     return es8311_write_reg(dev, ES8311_SYSTEM_REG14, reg14);
 }

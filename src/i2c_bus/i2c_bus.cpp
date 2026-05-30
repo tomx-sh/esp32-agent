@@ -6,7 +6,7 @@
 #include "pin_config.h"
 
 namespace {
-constexpr uint32_t kI2cClockHz = 400000;
+constexpr uint32_t kI2cClockHz = 100000;
 constexpr uint32_t kI2cTimeoutMs = 50;
 
 bool initialized = false;

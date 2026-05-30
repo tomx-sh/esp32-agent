@@ -38,9 +38,9 @@ lv_color_t *rotatedDrawBuffer = nullptr;
 
 lv_color_t *allocateDrawBuffer(const char *name) {
   constexpr size_t bufferBytes = LCD_WIDTH * kDrawBufferLines * sizeof(lv_color_t);
-  void *buffer = heap_caps_malloc(bufferBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  void *buffer = heap_caps_malloc(bufferBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   if (buffer == nullptr) {
-    buffer = heap_caps_malloc(bufferBytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    buffer = heap_caps_malloc(bufferBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   }
 
   if (buffer == nullptr) {

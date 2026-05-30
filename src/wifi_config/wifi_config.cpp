@@ -194,7 +194,8 @@ bool show_pet_sprite(const String &name, unsigned long ttlMs, String &error) {
   const String lvglPath = sprite_lvgl_path(name);
   lv_gif_get_size(lvglPath.c_str(), &width, &height);
   Serial.printf(
-      "Loading sprite %s: path=%s size=%u dims=%ux%u internal=%u largest_internal=%u psram=%u largest_psram=%u\n",
+      "%s sprite %s: path=%s size=%u dims=%ux%u internal=%u largest_internal=%u psram=%u largest_psram=%u\n",
+      ui_is_pet_page_active() ? "Loading" : "Queued",
       name.c_str(),
       lvglPath.c_str(),
       static_cast<unsigned>(fileSize),
@@ -636,7 +637,9 @@ void process_pending_pet_expiry() {
 }
 
 void process_pending_default_sprite_load() {
-  if (!defaultSpriteLoadPending || static_cast<long>(millis() - defaultSpriteLoadAtMs) < 0) {
+  if (!defaultSpriteLoadPending ||
+      !ui_is_pet_page_active() ||
+      static_cast<long>(millis() - defaultSpriteLoadAtMs) < 0) {
     return;
   }
 
