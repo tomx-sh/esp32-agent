@@ -9,6 +9,7 @@
 
 #include "audio/audio.h"
 #include "debug/debug_log.h"
+#include "generated/default_pet_sprites.h"
 #include "ui/ui.h"
 #include "web/config_page.h"
 
@@ -90,6 +91,40 @@ bool ensure_sprite_dir() {
   }
 
   return LittleFS.mkdir(kSpriteDir);
+}
+
+void seed_default_pet_sprites() {
+  for (size_t i = 0; i < default_pet_sprites::kSpriteCount; ++i) {
+    const default_pet_sprites::Sprite &sprite = default_pet_sprites::kSprites[i];
+    const String path = sprite_file_path(sprite.name);
+    if (LittleFS.exists(path)) {
+      continue;
+    }
+
+    File file = LittleFS.open(path, FILE_WRITE);
+    if (!file) {
+      Serial.printf("Could not create default sprite: %s\n", path.c_str());
+      continue;
+    }
+
+    const size_t written = file.write(sprite.data, sprite.size);
+    file.close();
+
+    if (written != sprite.size) {
+      LittleFS.remove(path);
+      Serial.printf(
+          "Default sprite write failed: %s wrote=%u expected=%u\n",
+          path.c_str(),
+          static_cast<unsigned>(written),
+          static_cast<unsigned>(sprite.size));
+      continue;
+    }
+
+    Serial.printf(
+        "Default sprite installed: %s (%u bytes)\n",
+        path.c_str(),
+        static_cast<unsigned>(sprite.size));
+  }
 }
 
 bool file_has_gif_header(const char *path) {
@@ -265,6 +300,8 @@ bool init_sprite_storage() {
     Serial.println("Could not create sprite directory");
     return false;
   }
+
+  seed_default_pet_sprites();
 
   Serial.printf(
       "LittleFS mounted: used=%u total=%u\n",
