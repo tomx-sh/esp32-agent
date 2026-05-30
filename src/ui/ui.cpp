@@ -71,17 +71,14 @@ void buildWifiConfigPage(lv_obj_t *parent) {
 }
 
 void buildPetPage(lv_obj_t *parent) {
-  lv_obj_t *content = createPageContent(parent);
-  lv_obj_set_style_pad_top(content, 20, 0);
-  lv_obj_set_style_pad_bottom(content, 20, 0);
-  lv_obj_set_style_pad_row(content, 12, 0);
-  lv_obj_set_flex_align(
-      content,
-      LV_FLEX_ALIGN_CENTER,
-      LV_FLEX_ALIGN_CENTER,
-      LV_FLEX_ALIGN_CENTER);
+  lv_obj_t *content = lv_obj_create(parent);
+  lv_obj_remove_style_all(content);
+  lv_obj_remove_flag(content, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_size(content, lv_pct(100), lv_pct(100));
 
   petGif = lv_gif_create(content);
+  lv_obj_set_size(petGif, lv_pct(100), lv_pct(100));
+  lv_image_set_inner_align(petGif, LV_IMAGE_ALIGN_CONTAIN);
   lv_gif_set_color_format(petGif, LV_COLOR_FORMAT_RGB565);
   lv_gif_set_auto_pause_invisible(petGif, true);
   lv_obj_add_flag(petGif, LV_OBJ_FLAG_HIDDEN);
@@ -89,6 +86,7 @@ void buildPetPage(lv_obj_t *parent) {
   petStatusLabel = lv_label_create(content);
   lv_label_set_text(petStatusLabel, "No pet sprite loaded");
   configureLabel(petStatusLabel, &lv_font_montserrat_20, LV_TEXT_ALIGN_CENTER);
+  lv_obj_align(petStatusLabel, LV_ALIGN_CENTER, 0, 0);
 }
 
 constexpr UiPageDefinition kPages[] = {
@@ -152,12 +150,14 @@ bool ui_show_pet_sprite(const char *name, const char *lvglPath) {
 
   if (!lv_gif_is_loaded(petGif)) {
     lv_obj_add_flag(petGif, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(petStatusLabel, LV_OBJ_FLAG_HIDDEN);
     lv_label_set_text_fmt(petStatusLabel, "Could not load %s", name == nullptr ? "sprite" : name);
     return false;
   }
 
   lv_obj_remove_flag(petGif, LV_OBJ_FLAG_HIDDEN);
-  lv_label_set_text(petStatusLabel, name == nullptr ? "" : name);
+  lv_obj_align(petGif, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_add_flag(petStatusLabel, LV_OBJ_FLAG_HIDDEN);
   return true;
 }
 
@@ -168,5 +168,6 @@ void ui_clear_pet_sprite(const char *message) {
 
   if (petStatusLabel != nullptr) {
     lv_label_set_text(petStatusLabel, message == nullptr ? "No pet sprite loaded" : message);
+    lv_obj_remove_flag(petStatusLabel, LV_OBJ_FLAG_HIDDEN);
   }
 }

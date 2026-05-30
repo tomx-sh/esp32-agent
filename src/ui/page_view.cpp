@@ -27,6 +27,7 @@ void updateIndicatorFromTileview(lv_event_t *event) {
 
   if (activeIndex >= 0) {
     ui_page_indicator_set_active(indicator, static_cast<size_t>(activeIndex));
+    lv_obj_move_foreground(indicator);
   }
 }
 }  // namespace
