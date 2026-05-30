@@ -23,15 +23,39 @@
 
     <p><button id="forget" type="button">Forget WiFi</button></p>
     <button id="beep">Play beep</button>
+
+    <h2>Pet sprites</h2>
+    <form id="sprite-form">
+      <label for="sprite-name">Sprite name</label>
+      <input id="sprite-name" name="name" autocomplete="off" required pattern="[A-Za-z0-9_-]{1,32}">
+      <br/>
+      <label for="sprite-file">Animated GIF</label>
+      <input id="sprite-file" name="file" type="file" accept="image/gif" required>
+      <p><button type="submit">Upload sprite</button></p>
+    </form>
+
+    <p>
+      <label for="sprite-select">Display sprite</label>
+      <select id="sprite-select"></select>
+      <input id="sprite-ttl" type="number" min="0" step="100" value="5000">
+      <button id="sprite-show" type="button">Show</button>
+    </p>
+
     <p id="status"></p>
 
     <p>Programmatic trigger:</p>
     <code>curl -X POST {{BASE_URL}}/beep</code>
+    <br/>
+    <code>curl -X POST {{BASE_URL}}/pet -H 'Content-Type: application/json' -d '{"name":"thinking","ttlMs":5000}'</code>
 
     <script>
       const button = document.getElementById('beep');
       const forget = document.getElementById('forget');
       const form = document.getElementById('wifi-form');
+      const spriteForm = document.getElementById('sprite-form');
+      const spriteSelect = document.getElementById('sprite-select');
+      const spriteShow = document.getElementById('sprite-show');
+      const spriteTtl = document.getElementById('sprite-ttl');
       const status = document.getElementById('status');
       const wifiStatus = document.getElementById('wifi-status');
 
@@ -41,6 +65,19 @@
         wifiStatus.textContent = 'Router status: ' + text;
         status.textContent = text;
         return text;
+      }
+
+      async function refreshSprites() {
+        const response = await fetch('/sprites');
+        const data = await response.json();
+        spriteSelect.innerHTML = '';
+
+        for (const sprite of data.sprites) {
+          const option = document.createElement('option');
+          option.value = sprite.name;
+          option.textContent = sprite.name + ' (' + sprite.size + ' bytes)';
+          spriteSelect.appendChild(option);
+        }
       }
 
       form.addEventListener('submit', async (event) => {
@@ -103,6 +140,56 @@
           forget.disabled = false;
         }
       });
+
+      spriteForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const name = document.getElementById('sprite-name').value;
+        const file = document.getElementById('sprite-file').files[0];
+
+        if (!file) {
+          status.textContent = 'Choose a GIF first';
+          return;
+        }
+
+        status.textContent = 'Uploading sprite...';
+        const body = new FormData();
+        body.append('file', file);
+
+        try {
+          const response = await fetch('/sprites/upload?name=' + encodeURIComponent(name), {
+            method: 'POST',
+            body,
+          });
+          const text = await response.text();
+          status.textContent = text;
+          await refreshSprites();
+        } catch (error) {
+          status.textContent = 'Sprite upload failed';
+        }
+      });
+
+      spriteShow.addEventListener('click', async () => {
+        if (!spriteSelect.value) {
+          status.textContent = 'No sprite uploaded';
+          return;
+        }
+
+        try {
+          const response = await fetch('/pet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: spriteSelect.value,
+              ttlMs: Number(spriteTtl.value) || 0,
+            }),
+          });
+          status.textContent = await response.text();
+        } catch (error) {
+          status.textContent = 'Display request failed';
+        }
+      });
+
+      refreshSprites();
     </script>
   </body>
 </html>

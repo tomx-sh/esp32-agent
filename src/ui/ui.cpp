@@ -1,5 +1,7 @@
 #include "ui.h"
 
+#include <cstdio>
+
 #include <lvgl.h>
 
 #include "page_view.h"
@@ -8,6 +10,9 @@ namespace {
 lv_obj_t *titleLabel = nullptr;
 lv_obj_t *ssidLabel = nullptr;
 lv_obj_t *urlLabel = nullptr;
+lv_obj_t *petGif = nullptr;
+lv_obj_t *petStatusLabel = nullptr;
+char petSpritePath[96] = "";
 
 void configureLabel(lv_obj_t *label, const lv_font_t *font, lv_text_align_t align) {
   lv_obj_set_width(label, lv_pct(100));
@@ -65,8 +70,30 @@ void buildWifiConfigPage(lv_obj_t *parent) {
   configureLabel(urlLabel, &lv_font_montserrat_20, LV_TEXT_ALIGN_LEFT);
 }
 
+void buildPetPage(lv_obj_t *parent) {
+  lv_obj_t *content = createPageContent(parent);
+  lv_obj_set_style_pad_top(content, 20, 0);
+  lv_obj_set_style_pad_bottom(content, 20, 0);
+  lv_obj_set_style_pad_row(content, 12, 0);
+  lv_obj_set_flex_align(
+      content,
+      LV_FLEX_ALIGN_CENTER,
+      LV_FLEX_ALIGN_CENTER,
+      LV_FLEX_ALIGN_CENTER);
+
+  petGif = lv_gif_create(content);
+  lv_gif_set_color_format(petGif, LV_COLOR_FORMAT_RGB565);
+  lv_gif_set_auto_pause_invisible(petGif, true);
+  lv_obj_add_flag(petGif, LV_OBJ_FLAG_HIDDEN);
+
+  petStatusLabel = lv_label_create(content);
+  lv_label_set_text(petStatusLabel, "No pet sprite loaded");
+  configureLabel(petStatusLabel, &lv_font_montserrat_20, LV_TEXT_ALIGN_CENTER);
+}
+
 constexpr UiPageDefinition kPages[] = {
     {"Hello", buildHelloPage},
+    {"Pet", buildPetPage},
     {"Wi-Fi", buildWifiConfigPage},
 };
 }
@@ -112,5 +139,34 @@ void ui_set_connection_overview(const char *headline, const char *details) {
 
   if (urlLabel != nullptr) {
     lv_label_set_text(urlLabel, details);
+  }
+}
+
+bool ui_show_pet_sprite(const char *name, const char *lvglPath) {
+  if (petGif == nullptr || petStatusLabel == nullptr || lvglPath == nullptr) {
+    return false;
+  }
+
+  snprintf(petSpritePath, sizeof(petSpritePath), "%s", lvglPath);
+  lv_gif_set_src(petGif, petSpritePath);
+
+  if (!lv_gif_is_loaded(petGif)) {
+    lv_obj_add_flag(petGif, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_text_fmt(petStatusLabel, "Could not load %s", name == nullptr ? "sprite" : name);
+    return false;
+  }
+
+  lv_obj_remove_flag(petGif, LV_OBJ_FLAG_HIDDEN);
+  lv_label_set_text(petStatusLabel, name == nullptr ? "" : name);
+  return true;
+}
+
+void ui_clear_pet_sprite(const char *message) {
+  if (petGif != nullptr) {
+    lv_obj_add_flag(petGif, LV_OBJ_FLAG_HIDDEN);
+  }
+
+  if (petStatusLabel != nullptr) {
+    lv_label_set_text(petStatusLabel, message == nullptr ? "No pet sprite loaded" : message);
   }
 }

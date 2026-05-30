@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <LittleFS.h>
 #include <databus/Arduino_ESP32QSPI.h>
 #include <display/Arduino_SH8601.h>
 #include <draw/sw/lv_draw_sw_utils.h>
@@ -98,6 +99,12 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("Starting LVGL display hello world");
+  Serial.printf(
+      "Heap: internal=%u, psram=%u/%u, largest_psram=%u\n",
+      heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+      ESP.getFreePsram(),
+      ESP.getPsramSize(),
+      heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
 
   if (!gfx->begin()) {
     Serial.println("Display init failed");
@@ -106,6 +113,10 @@ void setup() {
 
   gfx->setBrightness(180);
   gfx->fillScreen(RGB565_BLACK);
+
+  if (!LittleFS.begin(false)) {
+    Serial.println("LittleFS mount failed; sprite storage is unavailable until the filesystem is repaired");
+  }
 
   drawBuffer = allocateDrawBuffer("draw");
   rotatedDrawBuffer = allocateDrawBuffer("rotation");
