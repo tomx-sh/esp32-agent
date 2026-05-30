@@ -124,6 +124,7 @@ bool loadPendingPetSprite() {
 
   applyPixelArtScale(gif, petSpritePath);
   lv_gif_restart(gif);
+  lv_gif_set_loop_count(gif, 0);
   lv_gif_resume(gif);
 #if APP_DEBUG_GRAPHICS
   Serial.printf(
