@@ -35,11 +35,11 @@
     </form>
 
     <p>
-      <label for="sprite-select">Display sprite</label>
-      <select id="sprite-select"></select>
+      <label for="sprite-ttl">Display duration (ms)</label>
       <input id="sprite-ttl" type="number" min="0" step="100" value="5000">
-      <button id="sprite-show" type="button">Show</button>
     </p>
+    <ul id="sprite-list"></ul>
+    <p id="sprite-empty" hidden>No sprites uploaded yet.</p>
 
     <p id="status"></p>
 
@@ -53,8 +53,8 @@
       const forget = document.getElementById('forget');
       const form = document.getElementById('wifi-form');
       const spriteForm = document.getElementById('sprite-form');
-      const spriteSelect = document.getElementById('sprite-select');
-      const spriteShow = document.getElementById('sprite-show');
+      const spriteList = document.getElementById('sprite-list');
+      const spriteEmpty = document.getElementById('sprite-empty');
       const spriteTtl = document.getElementById('sprite-ttl');
       const status = document.getElementById('status');
       const wifiStatus = document.getElementById('wifi-status');
@@ -70,13 +70,95 @@
       async function refreshSprites() {
         const response = await fetch('/sprites');
         const data = await response.json();
-        spriteSelect.innerHTML = '';
 
-        for (const sprite of data.sprites) {
-          const option = document.createElement('option');
-          option.value = sprite.name;
-          option.textContent = sprite.name + ' (' + sprite.size + ' bytes)';
-          spriteSelect.appendChild(option);
+        spriteList.innerHTML = '';
+
+        if (!data.storageAvailable) {
+          spriteEmpty.hidden = false;
+          spriteEmpty.textContent = 'Sprite storage is unavailable.';
+          return;
+        }
+
+        const sprites = [...data.sprites].sort((a, b) => a.name.localeCompare(b.name));
+        spriteEmpty.hidden = sprites.length > 0;
+        spriteEmpty.textContent = 'No sprites uploaded yet.';
+
+        for (const sprite of sprites) {
+          const item = document.createElement('li');
+
+          const name = document.createElement('strong');
+          name.textContent = sprite.name;
+          item.appendChild(name);
+
+          item.appendChild(document.createTextNode(' - ' + sprite.size + ' bytes'));
+
+          if (sprite.active) {
+            item.appendChild(document.createTextNode(' (active)'));
+          }
+
+          if (sprite.isDefault) {
+            item.appendChild(document.createTextNode(' (default)'));
+          }
+
+          item.appendChild(document.createElement('br'));
+
+          const showButton = document.createElement('button');
+          showButton.type = 'button';
+          showButton.textContent = 'Show';
+          showButton.addEventListener('click', async () => {
+            showButton.disabled = true;
+            status.textContent = 'Showing sprite...';
+
+            try {
+              const showResponse = await fetch('/pet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name: sprite.name,
+                  ttlMs: Number(spriteTtl.value) || 0,
+                }),
+              });
+              status.textContent = await showResponse.text();
+              await refreshSprites();
+            } catch (error) {
+              status.textContent = 'Display request failed';
+            } finally {
+              showButton.disabled = false;
+            }
+          });
+          item.appendChild(showButton);
+          item.appendChild(document.createTextNode(' '));
+
+          const deleteButton = document.createElement('button');
+          deleteButton.type = 'button';
+          deleteButton.textContent = 'Delete';
+          deleteButton.addEventListener('click', async () => {
+            const confirmed = window.confirm(
+              'Delete sprite "' + sprite.name + '"? This cannot be undone.'
+            );
+            if (!confirmed) {
+              return;
+            }
+
+            deleteButton.disabled = true;
+            status.textContent = 'Deleting sprite...';
+
+            try {
+              const deleteResponse = await fetch(
+                '/sprites?name=' + encodeURIComponent(sprite.name),
+                { method: 'DELETE' }
+              );
+              status.textContent = await deleteResponse.text();
+              await refreshSprites();
+            } catch (error) {
+              status.textContent = 'Delete request failed';
+            } finally {
+              deleteButton.disabled = false;
+            }
+          });
+          item.appendChild(deleteButton);
+
+          spriteList.appendChild(item);
         }
       }
 
@@ -165,27 +247,6 @@
           await refreshSprites();
         } catch (error) {
           status.textContent = 'Sprite upload failed';
-        }
-      });
-
-      spriteShow.addEventListener('click', async () => {
-        if (!spriteSelect.value) {
-          status.textContent = 'No sprite uploaded';
-          return;
-        }
-
-        try {
-          const response = await fetch('/pet', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: spriteSelect.value,
-              ttlMs: Number(spriteTtl.value) || 0,
-            }),
-          });
-          status.textContent = await response.text();
-        } catch (error) {
-          status.textContent = 'Display request failed';
         }
       });
 

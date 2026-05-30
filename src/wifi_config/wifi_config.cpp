@@ -46,6 +46,8 @@ unsigned long petSpriteExpiresAtMs = 0;
 bool petSpriteExpires = false;
 bool spriteStorageReady = false;
 
+void show_default_pet_sprite();
+
 bool is_valid_sprite_name(const String &name) {
   if (name.length() == 0 || name.length() > 32) {
     return false;
@@ -120,6 +122,46 @@ bool validate_gif_dimensions(const String &name, String &error) {
     error = "GIF must be between 1x1 and " + String(kMaxSpriteWidth) + "x" +
             String(kMaxSpriteHeight);
     return false;
+  }
+
+  return true;
+}
+
+bool delete_sprite(const String &name, String &error) {
+  if (!spriteStorageReady) {
+    error = "Sprite storage unavailable";
+    return false;
+  }
+
+  if (!is_valid_sprite_name(name)) {
+    error = "Invalid sprite name";
+    return false;
+  }
+
+  const String filePath = sprite_file_path(name);
+  if (!LittleFS.exists(filePath)) {
+    error = "Sprite not found";
+    return false;
+  }
+
+  if (!LittleFS.remove(filePath)) {
+    error = "Could not delete sprite";
+    return false;
+  }
+
+  if (spriteUploadName == name) {
+    spriteUploadName = "";
+  }
+
+  if (temporarySpritePreviousName == name) {
+    temporarySpritePreviousName = "";
+  }
+
+  if (activeSpriteName == name) {
+    activeSpriteName = "";
+    petSpriteExpires = false;
+    petSpriteExpiresAtMs = 0;
+    show_default_pet_sprite();
   }
 
   return true;
@@ -315,6 +357,8 @@ void handleBeep() {
 void handleSpritesList() {
   JsonDocument doc;
   doc["storageAvailable"] = spriteStorageReady;
+  doc["activeSprite"] = activeSpriteName;
+  doc["defaultSpriteName"] = kDefaultSpriteName;
   JsonArray sprites = doc["sprites"].to<JsonArray>();
 
   File dir = spriteStorageReady ? LittleFS.open(kSpriteDir) : File();
@@ -327,6 +371,8 @@ void handleSpritesList() {
         String name = path.substring(String(kSpriteDir).length() + 1, path.length() - 4);
         sprite["name"] = name;
         sprite["size"] = file.size();
+        sprite["active"] = name == activeSpriteName;
+        sprite["isDefault"] = name == kDefaultSpriteName;
       }
 
       file = dir.openNextFile();
@@ -336,6 +382,18 @@ void handleSpritesList() {
   String response;
   serializeJson(doc, response);
   server.send(200, "application/json", response);
+}
+
+void handleSpriteDelete() {
+  const String name = server.arg("name");
+
+  String error;
+  if (!delete_sprite(name, error)) {
+    server.send(400, "text/plain", error);
+    return;
+  }
+
+  server.send(200, "text/plain", "Sprite deleted: " + name);
 }
 
 void handleSpriteUploadData() {
@@ -596,6 +654,7 @@ void wifi_config_init() {
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/beep", HTTP_POST, handleBeep);
   server.on("/sprites", HTTP_GET, handleSpritesList);
+  server.on("/sprites", HTTP_DELETE, handleSpriteDelete);
   server.on("/sprites/upload", HTTP_POST, handleSpriteUploadComplete, handleSpriteUploadData);
   server.on("/pet", HTTP_POST, handlePetCommand);
   server.on("/connect", HTTP_POST, handleConnect);
