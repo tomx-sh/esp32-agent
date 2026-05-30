@@ -29,7 +29,7 @@ void configureLabel(lv_obj_t *label, const lv_font_t *font, lv_text_align_t alig
   lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
 }
 
-void applyPixelArtScale(lv_obj_t *gif, const char *lvglPath) {
+void applyContainScale(lv_obj_t *gif, const char *lvglPath) {
   uint16_t gifWidth = 0;
   uint16_t gifHeight = 0;
   if (!lv_gif_get_size(lvglPath, &gifWidth, &gifHeight) || gifWidth == 0 || gifHeight == 0) {
@@ -47,10 +47,15 @@ void applyPixelArtScale(lv_obj_t *gif, const char *lvglPath) {
     return;
   }
 
-  const int32_t scaleX = availableWidth / gifWidth;
-  const int32_t scaleY = availableHeight / gifHeight;
-  const int32_t integerScale = LV_MAX(1, LV_MIN(scaleX, scaleY));
-  lv_image_set_scale(gif, static_cast<uint32_t>(integerScale * LV_SCALE_NONE));
+  const uint32_t scaleX =
+      static_cast<uint32_t>((static_cast<uint64_t>(availableWidth) * LV_SCALE_NONE) / gifWidth);
+  const uint32_t scaleY =
+      static_cast<uint32_t>((static_cast<uint64_t>(availableHeight) * LV_SCALE_NONE) / gifHeight);
+  uint32_t containScale = scaleX < scaleY ? scaleX : scaleY;
+  if (containScale == 0) {
+    containScale = 1;
+  }
+  lv_image_set_scale(gif, containScale);
 }
 
 lv_obj_t *ensurePetGif() {
@@ -119,7 +124,7 @@ bool loadPendingPetSprite() {
     return false;
   }
 
-  applyPixelArtScale(gif, petSpritePath);
+  applyContainScale(gif, petSpritePath);
   lv_gif_restart(gif);
   lv_gif_set_loop_count(gif, 0);
   lv_gif_resume(gif);
