@@ -7,58 +7,79 @@
   </head>
   <body>
     <h1>ESP32 Config</h1>
-    <p>Device is online.</p>
 
-    <p id="wifi-status">Router status: {{STATION_STATUS}}</p>
+    <section>
+      <h2>WiFi config</h2>
+      <p id="wifi-status">Router status: {{STATION_STATUS}}</p>
+      <p id="wifi-action-status"></p>
 
-    <form id="wifi-form">
-      <label for="ssid">Router SSID</label>
-      <input id="ssid" name="ssid" autocomplete="off" required>
+      <form id="wifi-form">
+        <label for="ssid">Router SSID</label>
+        <input id="ssid" name="ssid" autocomplete="off" required>
         <br/>
-      <label for="password">Router password</label>
-      <input id="password" name="password" type="password">
+        <label for="password">Router password</label>
+        <input id="password" name="password" type="password">
 
-      <p><button type="submit">Connect to router</button></p>
-    </form>
+        <p><button type="submit">Connect to router</button></p>
+      </form>
 
-    <p><button id="forget" type="button">Forget WiFi</button></p>
-    <button id="beep">Play beep</button>
+      <p><button id="forget" type="button">Forget WiFi</button></p>
 
-    <h2>Display</h2>
-    <form id="brightness-form">
-      <label for="brightness">Brightness</label>
-      <input id="brightness" name="brightness" type="range" min="0" max="255" value="180">
-      <input id="brightness-number" type="number" min="0" max="255" value="180">
-      <button type="submit">Save brightness</button>
-    </form>
-
-    <h2>Pet sprites</h2>
-    <form id="sprite-form">
-      <label for="sprite-name">Sprite name</label>
-      <input id="sprite-name" name="name" autocomplete="off" required pattern="[A-Za-z0-9_-]{1,32}">
+      <p>Programmatic commands:</p>
+      <code>curl -X POST {{BASE_URL}}/connect -d "ssid=MyWiFi" -d "password=MyPassword"</code>
       <br/>
-      <label for="sprite-file">Animated GIF</label>
-      <input id="sprite-file" name="file" type="file" accept="image/gif" required>
-      <p><button type="submit">Upload sprite</button></p>
-    </form>
+      <code>curl -X POST {{BASE_URL}}/forget</code>
+      <br/>
+      <code>curl {{BASE_URL}}/status</code>
+    </section>
 
-    <p>
-      <label for="sprite-ttl">Display duration (ms)</label>
-      <input id="sprite-ttl" type="number" min="0" step="100" value="5000">
-    </p>
-    <ul id="sprite-list"></ul>
-    <p id="sprite-empty" hidden>No sprites uploaded yet.</p>
+    <section>
+      <h2>Audio</h2>
+      <p><button id="beep" type="button">Play beep</button></p>
+      <p id="audio-status"></p>
 
-    <p id="status"></p>
+      <p>Programmatic commands:</p>
+      <code>curl -X POST {{BASE_URL}}/beep</code>
+    </section>
 
-    <p>Programmatic trigger:</p>
-    <code>curl -X POST {{BASE_URL}}/beep</code>
-    <br/>
-    <code>curl -X POST {{BASE_URL}}/brightness -H 'Content-Type: application/json' -d '{"brightness":180}'</code>
-    <br/>
-    <code>curl -X POST {{BASE_URL}}/pet -H 'Content-Type: application/json' -d '{"name":"thinking","ttlMs":5000}'</code>
-    <br/>
-    <code>curl -X POST {{BASE_URL}}/pet/message -H 'Content-Type: application/json' -d '{"message":"Hello from Codex","ttlMs":5000}'</code>
+    <section>
+      <h2>Display</h2>
+      <form id="brightness-form">
+        <label for="brightness">Brightness</label>
+        <input id="brightness" name="brightness" type="range" min="0" max="255" value="180">
+        <input id="brightness-number" type="number" min="0" max="255" value="180">
+        <button type="submit">Save brightness</button>
+      </form>
+      <p id="display-status"></p>
+
+      <p>Programmatic commands:</p>
+      <code>curl -X POST {{BASE_URL}}/brightness -H 'Content-Type: application/json' -d '{"brightness":180}'</code>
+    </section>
+
+    <section>
+      <h2>Pet sprites</h2>
+      <form id="sprite-form">
+        <label for="sprite-name">Sprite name</label>
+        <input id="sprite-name" name="name" autocomplete="off" required pattern="[A-Za-z0-9_-]{1,32}">
+        <br/>
+        <label for="sprite-file">Animated GIF</label>
+        <input id="sprite-file" name="file" type="file" accept="image/gif" required>
+        <p><button type="submit">Upload sprite</button></p>
+      </form>
+
+      <p>
+        <label for="sprite-ttl">Display duration (ms)</label>
+        <input id="sprite-ttl" type="number" min="0" step="100" value="5000">
+      </p>
+      <ul id="sprite-list"></ul>
+      <p id="sprite-empty" hidden>No sprites uploaded yet.</p>
+      <p id="sprite-status"></p>
+
+      <p>Programmatic commands:</p>
+      <code>curl -X POST {{BASE_URL}}/pet -H 'Content-Type: application/json' -d '{"name":"thinking","ttlMs":5000}'</code>
+      <br/>
+      <code>curl -X POST {{BASE_URL}}/pet/message -H 'Content-Type: application/json' -d '{"message":"Hello from Codex","ttlMs":5000}'</code>
+    </section>
 
     <script>
       const button = document.getElementById('beep');
@@ -71,14 +92,16 @@
       const spriteList = document.getElementById('sprite-list');
       const spriteEmpty = document.getElementById('sprite-empty');
       const spriteTtl = document.getElementById('sprite-ttl');
-      const status = document.getElementById('status');
       const wifiStatus = document.getElementById('wifi-status');
+      const wifiActionStatus = document.getElementById('wifi-action-status');
+      const audioStatus = document.getElementById('audio-status');
+      const displayStatus = document.getElementById('display-status');
+      const spriteStatus = document.getElementById('sprite-status');
 
       async function refreshStatus() {
         const response = await fetch('/status');
         const text = await response.text();
         wifiStatus.textContent = 'Router status: ' + text;
-        status.textContent = text;
         return text;
       }
 
@@ -134,7 +157,7 @@
           showButton.textContent = 'Show';
           showButton.addEventListener('click', async () => {
             showButton.disabled = true;
-            status.textContent = 'Showing sprite...';
+            spriteStatus.textContent = 'Showing sprite...';
 
             try {
               const showResponse = await fetch('/pet', {
@@ -145,10 +168,10 @@
                   ttlMs: Number(spriteTtl.value) || 0,
                 }),
               });
-              status.textContent = await showResponse.text();
+              spriteStatus.textContent = await showResponse.text();
               await refreshSprites();
             } catch (error) {
-              status.textContent = 'Display request failed';
+              spriteStatus.textContent = 'Display request failed';
             } finally {
               showButton.disabled = false;
             }
@@ -168,17 +191,17 @@
             }
 
             deleteButton.disabled = true;
-            status.textContent = 'Deleting sprite...';
+            spriteStatus.textContent = 'Deleting sprite...';
 
             try {
               const deleteResponse = await fetch(
                 '/sprites?name=' + encodeURIComponent(sprite.name),
                 { method: 'DELETE' }
               );
-              status.textContent = await deleteResponse.text();
+              spriteStatus.textContent = await deleteResponse.text();
               await refreshSprites();
             } catch (error) {
-              status.textContent = 'Delete request failed';
+              spriteStatus.textContent = 'Delete request failed';
             } finally {
               deleteButton.disabled = false;
             }
@@ -193,7 +216,7 @@
         event.preventDefault();
 
         const formData = new FormData(form);
-        status.textContent = 'Connecting to router...';
+        wifiActionStatus.textContent = 'Connecting to router...';
 
         try {
           const response = await fetch('/connect', {
@@ -202,7 +225,7 @@
           });
           const text = await response.text();
 
-          status.textContent = text;
+          wifiActionStatus.textContent = text;
           wifiStatus.textContent = 'Router status: ' + text;
 
           if (response.status === 202) {
@@ -216,19 +239,19 @@
             }
           }
         } catch (error) {
-          status.textContent = 'Connection request failed';
+          wifiActionStatus.textContent = 'Connection request failed';
         }
       });
 
       button.addEventListener('click', async () => {
         button.disabled = true;
-        status.textContent = 'Playing...';
+        audioStatus.textContent = 'Playing...';
 
         try {
           const response = await fetch('/beep', { method: 'POST' });
-          status.textContent = response.ok ? 'Beep played' : 'Beep failed';
+          audioStatus.textContent = response.ok ? 'Beep played' : 'Beep failed';
         } catch (error) {
-          status.textContent = 'Request failed';
+          audioStatus.textContent = 'Request failed';
         }
 
         button.disabled = false;
@@ -245,7 +268,7 @@
       brightnessForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         const value = Number(brightness.value);
-        status.textContent = 'Saving brightness...';
+        displayStatus.textContent = 'Saving brightness...';
 
         try {
           const response = await fetch('/brightness', {
@@ -253,24 +276,24 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ brightness: value }),
           });
-          status.textContent = await response.text();
+          displayStatus.textContent = await response.text();
         } catch (error) {
-          status.textContent = 'Brightness request failed';
+          displayStatus.textContent = 'Brightness request failed';
         }
       });
 
       forget.addEventListener('click', async () => {
         forget.disabled = true;
-        status.textContent = 'Forgetting WiFi...';
+        wifiActionStatus.textContent = 'Forgetting WiFi...';
 
         try {
           const response = await fetch('/forget', { method: 'POST' });
           const text = await response.text();
 
-          status.textContent = text;
+          wifiActionStatus.textContent = text;
           wifiStatus.textContent = 'Router status: ' + text;
         } catch (error) {
-          status.textContent = 'Forget request failed';
+          wifiActionStatus.textContent = 'Forget request failed';
           forget.disabled = false;
         }
       });
@@ -281,11 +304,11 @@
         const file = document.getElementById('sprite-file').files[0];
 
         if (!file) {
-          status.textContent = 'Choose a GIF first';
+          spriteStatus.textContent = 'Choose a GIF first';
           return;
         }
 
-        status.textContent = 'Uploading sprite...';
+        spriteStatus.textContent = 'Uploading sprite...';
         const body = new FormData();
         body.append('file', file);
 
@@ -295,10 +318,10 @@
             body,
           });
           const text = await response.text();
-          status.textContent = text;
+          spriteStatus.textContent = text;
           await refreshSprites();
         } catch (error) {
-          status.textContent = 'Sprite upload failed';
+          spriteStatus.textContent = 'Sprite upload failed';
         }
       });
 
