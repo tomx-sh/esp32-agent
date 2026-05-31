@@ -1,6 +1,7 @@
 #include "ota_update.h"
 
 #include <ArduinoOTA.h>
+#include <ESPmDNS.h>
 #include <WiFi.h>
 
 #include <cstring>
@@ -10,10 +11,26 @@
 
 namespace {
 constexpr uint16_t kOtaPort = 3232;
+constexpr unsigned long kIpv6LinkLocalWaitMs = 2000;
 
 #ifndef OTA_PASSWORD
 #define OTA_PASSWORD ""
 #endif
+
+bool has_station_ipv6() {
+  return WiFi.linkLocalIPv6() != IPAddress(IPv6);
+}
+
+void wait_for_station_ipv6() {
+  if (WiFi.status() != WL_CONNECTED || has_station_ipv6()) {
+    return;
+  }
+
+  const unsigned long startMs = millis();
+  while (!has_station_ipv6() && millis() - startMs < kIpv6LinkLocalWaitMs) {
+    delay(100);
+  }
+}
 
 void set_ota_status(const char *title, const char *message) {
   Serial.printf("%s: %s\n", title, message);
@@ -61,11 +78,18 @@ void ota_update_init() {
     set_ota_status("OTA Error", message);
   });
 
+  wait_for_station_ipv6();
   ArduinoOTA.begin();
+  if (MDNS.addService("http", "tcp", 80)) {
+    Serial.printf("mDNS HTTP service ready: http://%s.local/\n", app_network::kHostname);
+  } else {
+    Serial.println("mDNS HTTP service registration failed");
+  }
 
   Serial.printf("OTA ready: %s.local:%u\n", app_network::kHostname, kOtaPort);
   if (WiFi.status() == WL_CONNECTED) {
     Serial.printf("OTA station IP: %s\n", WiFi.localIP().toString().c_str());
+    Serial.printf("OTA station IPv6: %s\n", WiFi.linkLocalIPv6().toString(true).c_str());
   }
 }
 

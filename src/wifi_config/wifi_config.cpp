@@ -826,7 +826,9 @@ void handleConnect() {
   stationConnectStartedMs = millis();
   refresh_ui();
 
+  WiFi.setHostname(app_network::kHostname);
   WiFi.mode(WIFI_AP_STA);
+  WiFi.enableIPv6();
   WiFi.persistent(true);
   WiFi.disconnect(false, true);
   WiFi.begin(ssid.c_str(), password.c_str());
@@ -932,7 +934,9 @@ void wifi_config_init() {
   defaultSpriteLoadPending = true;
   defaultSpriteLoadAtMs = millis() + 250;
 
+  WiFi.setHostname(app_network::kHostname);
   WiFi.mode(WIFI_AP_STA);
+  WiFi.enableIPv6();
   WiFi.persistent(true);
   WiFi.begin();
 
