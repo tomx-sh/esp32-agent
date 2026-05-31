@@ -37,7 +37,7 @@ Example `.codex/hooks.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/.codex/hooks/esp32-agent.sh\" codex-waving 4000",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" codex-waving 4000",
             "statusMessage": "Showing ESP32 agent session start"
           }
         ]
@@ -48,7 +48,7 @@ Example `.codex/hooks.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/.codex/hooks/esp32-agent.sh\" codex-thinking 0",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" codex-thinking 0",
             "statusMessage": "Showing ESP32 agent thinking"
           }
         ]
@@ -60,7 +60,7 @@ Example `.codex/hooks.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/.codex/hooks/esp32-agent.sh\" codex-waiting 0",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" codex-waiting 0",
             "statusMessage": "Showing ESP32 agent waiting"
           }
         ]
@@ -72,7 +72,7 @@ Example `.codex/hooks.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/.codex/hooks/esp32-agent.sh\" codex-review 3000",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" codex-review 3000",
             "statusMessage": "Showing ESP32 agent tool review"
           }
         ]
@@ -83,7 +83,7 @@ Example `.codex/hooks.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/.codex/hooks/esp32-agent.sh\" codex-idle 0",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" codex-idle 0",
             "statusMessage": "Showing ESP32 agent idle"
           }
         ]
@@ -93,7 +93,7 @@ Example `.codex/hooks.json`:
 }
 ```
 
-Example `.codex/hooks/esp32-agent.sh`:
+Example `scripts/esp32-agent-hook.sh`:
 
 ```sh
 #!/bin/sh
@@ -103,9 +103,11 @@ sprite="${1:-codex-idle}"
 ttl_ms="${2:-0}"
 base_url="${ESP32_AGENT_URL:-http://esp32-agent.local}"
 
+payload=$(printf '{"name":"%s","ttlMs":%s}' "$sprite" "$ttl_ms")
+
 curl -fsS -m 2 -X POST "$base_url/pet" \
   -H 'Content-Type: application/json' \
-  -d "{\"name\":\"$sprite\",\"ttlMs\":$ttl_ms}" >/dev/null
+  -d "$payload" >/dev/null
 ```
 
 If `esp32-agent.local` does not resolve, set `ESP32_AGENT_URL` to the IP shown on the device display, for example `ESP32_AGENT_URL=http://192.168.1.42`.
@@ -146,3 +148,96 @@ curl -X POST "$ESP32_AGENT_URL/pet" -H 'Content-Type: application/json' -d '{"na
 curl -X POST "$ESP32_AGENT_URL/pet" -H 'Content-Type: application/json' -d '{"name":"codex-idle","ttlMs":0}'
 curl -X POST "$ESP32_AGENT_URL/pet/message" -H 'Content-Type: application/json' -d '{"message":"Codex needs approval","ttlMs":5000}'
 ```
+
+## Claude Code event hooks
+
+Claude Code can drive the same display API, but its hook configuration is settings-based instead of `hooks.json`-based.
+
+Claude Code hook reference: <https://code.claude.com/docs/en/hooks>
+Claude Code settings reference: <https://code.claude.com/docs/en/settings>
+
+Claude Code loads hooks from `~/.claude/settings.json`, `.claude/settings.json`, or `.claude/settings.local.json`. For this repo, use `.claude/settings.json` for team-shared hooks or `.claude/settings.local.json` for personal overrides. Settings reload automatically when they change, and `/hooks` shows the active hooks. `matcher` only applies to `PreToolUse` and `PostToolUse`, so leave it out for the other events.
+
+Example `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" claude-code-session-start 4000"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" claude-code-user-prompt-submit 0"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" claude-code-pre-tool-use 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" claude-code-post-tool-use 3000"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" claude-code-notification 0"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" claude-code-stop 0"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Useful Claude events:
+
+| Claude event | Suggested sprite | Notes |
+| --- | --- | --- |
+| `SessionStart` | `claude-code-session-start` | New or resumed session |
+| `UserPromptSubmit` | `claude-code-user-prompt-submit` | Prompt accepted |
+| `Notification` | `claude-code-notification` | Claude is waiting on input or permission |
+| `PreToolUse` | `claude-code-pre-tool-use` | Tool is about to run; can be noisy |
+| `PostToolUse` | `claude-code-post-tool-use` | Tool completed |
+| `Stop` | `claude-code-stop` | Turn finished |
+
+If `esp32-agent.local` does not resolve, set `ESP32_AGENT_URL` to the IP shown on the device display, for example `ESP32_AGENT_URL=http://192.168.1.42`.
