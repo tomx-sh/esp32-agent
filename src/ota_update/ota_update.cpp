@@ -5,10 +5,10 @@
 
 #include <cstring>
 
+#include "app_network.h"
 #include "ui/ui.h"
 
 namespace {
-constexpr char kOtaHostname[] = "esp32-agent";
 constexpr uint16_t kOtaPort = 3232;
 
 #ifndef OTA_PASSWORD
@@ -22,7 +22,7 @@ void set_ota_status(const char *title, const char *message) {
 }  // namespace
 
 void ota_update_init() {
-  ArduinoOTA.setHostname(kOtaHostname);
+  ArduinoOTA.setHostname(app_network::kHostname);
   ArduinoOTA.setPort(kOtaPort);
 
   if (std::strlen(OTA_PASSWORD) > 0) {
@@ -63,7 +63,7 @@ void ota_update_init() {
 
   ArduinoOTA.begin();
 
-  Serial.printf("OTA ready: %s.local:%u\n", kOtaHostname, kOtaPort);
+  Serial.printf("OTA ready: %s.local:%u\n", app_network::kHostname, kOtaPort);
   if (WiFi.status() == WL_CONNECTED) {
     Serial.printf("OTA station IP: %s\n", WiFi.localIP().toString().c_str());
   }

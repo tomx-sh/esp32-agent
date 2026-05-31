@@ -7,6 +7,7 @@
 #include <cstring>
 #include <lvgl.h>
 
+#include "app_network.h"
 #include "audio/audio.h"
 #include "debug/debug_log.h"
 #include "generated/default_pet_sprites.h"
@@ -322,7 +323,8 @@ void refresh_ui() {
 
   if (stationConnected) {
     headline = "WiFi:\nConnected to " + stationSsid;
-    details = "\nDashboard:\nhttp://" + WiFi.localIP().toString() + "/";
+    details = "\nDashboard:\nhttp://" + String(app_network::kHostname) + ".local/" +
+              "\nor http://" + WiFi.localIP().toString() + "/";
 
     if (apActive) {
       details += "\n\nHotspot:\n" + String(kAccessPointSsid) +
