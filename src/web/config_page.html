@@ -24,6 +24,14 @@
     <p><button id="forget" type="button">Forget WiFi</button></p>
     <button id="beep">Play beep</button>
 
+    <h2>Display</h2>
+    <form id="brightness-form">
+      <label for="brightness">Brightness</label>
+      <input id="brightness" name="brightness" type="range" min="0" max="255" value="180">
+      <input id="brightness-number" type="number" min="0" max="255" value="180">
+      <button type="submit">Save brightness</button>
+    </form>
+
     <h2>Pet sprites</h2>
     <form id="sprite-form">
       <label for="sprite-name">Sprite name</label>
@@ -46,6 +54,8 @@
     <p>Programmatic trigger:</p>
     <code>curl -X POST {{BASE_URL}}/beep</code>
     <br/>
+    <code>curl -X POST {{BASE_URL}}/brightness -H 'Content-Type: application/json' -d '{"brightness":180}'</code>
+    <br/>
     <code>curl -X POST {{BASE_URL}}/pet -H 'Content-Type: application/json' -d '{"name":"thinking","ttlMs":5000}'</code>
     <br/>
     <code>curl -X POST {{BASE_URL}}/pet/message -H 'Content-Type: application/json' -d '{"message":"Hello from Codex","ttlMs":5000}'</code>
@@ -54,6 +64,9 @@
       const button = document.getElementById('beep');
       const forget = document.getElementById('forget');
       const form = document.getElementById('wifi-form');
+      const brightnessForm = document.getElementById('brightness-form');
+      const brightness = document.getElementById('brightness');
+      const brightnessNumber = document.getElementById('brightness-number');
       const spriteForm = document.getElementById('sprite-form');
       const spriteList = document.getElementById('sprite-list');
       const spriteEmpty = document.getElementById('sprite-empty');
@@ -67,6 +80,18 @@
         wifiStatus.textContent = 'Router status: ' + text;
         status.textContent = text;
         return text;
+      }
+
+      function syncBrightnessControls(value) {
+        const normalized = Math.max(0, Math.min(255, Number(value) || 0));
+        brightness.value = normalized;
+        brightnessNumber.value = normalized;
+      }
+
+      async function refreshBrightness() {
+        const response = await fetch('/brightness');
+        const data = await response.json();
+        syncBrightnessControls(data.brightness);
       }
 
       async function refreshSprites() {
@@ -209,6 +234,31 @@
         button.disabled = false;
       });
 
+      brightness.addEventListener('input', () => {
+        syncBrightnessControls(brightness.value);
+      });
+
+      brightnessNumber.addEventListener('input', () => {
+        syncBrightnessControls(brightnessNumber.value);
+      });
+
+      brightnessForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const value = Number(brightness.value);
+        status.textContent = 'Saving brightness...';
+
+        try {
+          const response = await fetch('/brightness', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ brightness: value }),
+          });
+          status.textContent = await response.text();
+        } catch (error) {
+          status.textContent = 'Brightness request failed';
+        }
+      });
+
       forget.addEventListener('click', async () => {
         forget.disabled = true;
         status.textContent = 'Forgetting WiFi...';
@@ -252,6 +302,7 @@
         }
       });
 
+      refreshBrightness();
       refreshSprites();
     </script>
   </body>

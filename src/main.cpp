@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Preferences.h>
 #include <databus/Arduino_ESP32QSPI.h>
 #include <display/Arduino_SH8601.h>
 #include <draw/sw/lv_draw_sw_utils.h>
@@ -7,6 +8,7 @@
 
 #include "audio/audio.h"
 #include "debug/debug_log.h"
+#include "display_control.h"
 #include "ota_update/ota_update.h"
 #include "pin_config.h"
 #include "touch/touch.h"
@@ -17,6 +19,9 @@ namespace {
 constexpr uint32_t kLvglTickMs = 5;
 constexpr uint32_t kDrawBufferLines = 40;
 constexpr lv_display_rotation_t kDisplayRotation = LV_DISPLAY_ROTATION_90;
+constexpr uint8_t kDefaultDisplayBrightness = 180;
+constexpr char kDisplayPreferencesNamespace[] = "display";
+constexpr char kBrightnessPreferenceKey[] = "brightness";
 
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(
     LCD_CS,
@@ -36,6 +41,7 @@ Arduino_SH8601 *gfx = new Arduino_SH8601(
 lv_display_t *display = nullptr;
 lv_color_t *drawBuffer = nullptr;
 lv_color_t *rotatedDrawBuffer = nullptr;
+uint8_t displayBrightness = kDefaultDisplayBrightness;
 
 lv_color_t *allocateDrawBuffer(const char *name) {
   constexpr size_t bufferBytes = LCD_WIDTH * kDrawBufferLines * sizeof(lv_color_t);
@@ -118,6 +124,42 @@ void flushDisplay(lv_display_t *disp, const lv_area_t *area, uint8_t *pxMap) {
 }
 }  // namespace
 
+void display_control_load_settings() {
+  Preferences preferences;
+  if (!preferences.begin(kDisplayPreferencesNamespace, true)) {
+    displayBrightness = kDefaultDisplayBrightness;
+    return;
+  }
+
+  displayBrightness = preferences.getUChar(kBrightnessPreferenceKey, kDefaultDisplayBrightness);
+  preferences.end();
+}
+
+uint8_t display_control_get_brightness() {
+  return displayBrightness;
+}
+
+void display_control_set_brightness(uint8_t brightness, bool persist) {
+  displayBrightness = brightness;
+
+  if (gfx != nullptr) {
+    gfx->setBrightness(brightness);
+  }
+
+  if (!persist) {
+    return;
+  }
+
+  Preferences preferences;
+  if (!preferences.begin(kDisplayPreferencesNamespace, false)) {
+    Serial.println("Display brightness preference open failed");
+    return;
+  }
+
+  preferences.putUChar(kBrightnessPreferenceKey, brightness);
+  preferences.end();
+}
+
 void setup() {
   Serial.begin(115200);
   delay(1000);
@@ -135,7 +177,8 @@ void setup() {
     return;
   }
 
-  gfx->setBrightness(180);
+  display_control_load_settings();
+  display_control_set_brightness(display_control_get_brightness(), false);
   gfx->fillScreen(RGB565_BLACK);
   debug_log_heap("display-begin");
 

@@ -10,6 +10,7 @@
 #include "app_network.h"
 #include "audio/audio.h"
 #include "debug/debug_log.h"
+#include "display_control.h"
 #include "generated/default_pet_sprites.h"
 #include "ui/ui.h"
 #include "web/config_page.h"
@@ -75,6 +76,67 @@ bool is_valid_sprite_name(const String &name) {
   }
 
   return true;
+}
+
+bool parse_uint8_arg(const String &value, uint8_t &result) {
+  if (value.length() == 0) {
+    return false;
+  }
+
+  for (size_t i = 0; i < value.length(); ++i) {
+    if (!isDigit(value[i])) {
+      return false;
+    }
+  }
+
+  const int parsed = value.toInt();
+  if (parsed < kDisplayBrightnessMin || parsed > kDisplayBrightnessMax) {
+    return false;
+  }
+
+  result = static_cast<uint8_t>(parsed);
+  return true;
+}
+
+bool parse_brightness_request(uint8_t &brightness, String &error) {
+  if (server.hasArg("plain") && server.arg("plain").length() > 0) {
+    JsonDocument doc;
+    DeserializationError jsonError = deserializeJson(doc, server.arg("plain"));
+    if (jsonError) {
+      error = "Invalid JSON";
+      return false;
+    }
+
+    JsonVariant value = doc["brightness"];
+    if (value.isNull()) {
+      value = doc["value"];
+    }
+
+    if (!value.is<int>()) {
+      error = "Missing brightness";
+      return false;
+    }
+
+    const int parsed = value.as<int>();
+    if (parsed < kDisplayBrightnessMin || parsed > kDisplayBrightnessMax) {
+      error = "Brightness must be between 0 and 255";
+      return false;
+    }
+
+    brightness = static_cast<uint8_t>(parsed);
+    return true;
+  }
+
+  if (server.hasArg("brightness") && parse_uint8_arg(server.arg("brightness"), brightness)) {
+    return true;
+  }
+
+  if (server.hasArg("value") && parse_uint8_arg(server.arg("value"), brightness)) {
+    return true;
+  }
+
+  error = "Brightness must be between 0 and 255";
+  return false;
 }
 
 String sprite_file_path(const String &name) {
@@ -393,6 +455,29 @@ void handleRoot() {
 
 void handleStatus() {
   server.send(200, "text/plain", stationStatus);
+}
+
+void handleBrightnessGet() {
+  JsonDocument doc;
+  doc["brightness"] = display_control_get_brightness();
+  doc["min"] = kDisplayBrightnessMin;
+  doc["max"] = kDisplayBrightnessMax;
+
+  String response;
+  serializeJson(doc, response);
+  server.send(200, "application/json", response);
+}
+
+void handleBrightnessPost() {
+  uint8_t brightness = 0;
+  String error;
+  if (!parse_brightness_request(brightness, error)) {
+    server.send(400, "text/plain", error);
+    return;
+  }
+
+  display_control_set_brightness(brightness, true);
+  server.send(200, "text/plain", "Brightness set to " + String(brightness));
 }
 
 void handleBeep() {
@@ -762,6 +847,8 @@ void wifi_config_init() {
 
   server.on("/", HTTP_GET, handleRoot);
   server.on("/status", HTTP_GET, handleStatus);
+  server.on("/brightness", HTTP_GET, handleBrightnessGet);
+  server.on("/brightness", HTTP_POST, handleBrightnessPost);
   server.on("/beep", HTTP_POST, handleBeep);
   server.on("/sprites", HTTP_GET, handleSpritesList);
   server.on("/sprites", HTTP_DELETE, handleSpriteDelete);
