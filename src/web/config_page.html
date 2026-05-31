@@ -57,6 +57,17 @@
     </section>
 
     <section>
+      <h2>Pages</h2>
+      <ul id="page-list"></ul>
+      <p id="page-status"></p>
+
+      <p>Programmatic commands:</p>
+      <code>curl {{BASE_URL}}/pages</code>
+      <br/>
+      <code>curl -X POST {{BASE_URL}}/page -H 'Content-Type: application/json' -d '{"index":1}'</code>
+    </section>
+
+    <section>
       <h2>Pet sprites</h2>
       <form id="sprite-form">
         <label for="sprite-name">Sprite name</label>
@@ -92,10 +103,12 @@
       const spriteList = document.getElementById('sprite-list');
       const spriteEmpty = document.getElementById('sprite-empty');
       const spriteTtl = document.getElementById('sprite-ttl');
+      const pageList = document.getElementById('page-list');
       const wifiStatus = document.getElementById('wifi-status');
       const wifiActionStatus = document.getElementById('wifi-action-status');
       const audioStatus = document.getElementById('audio-status');
       const displayStatus = document.getElementById('display-status');
+      const pageStatus = document.getElementById('page-status');
       const spriteStatus = document.getElementById('sprite-status');
 
       async function refreshStatus() {
@@ -115,6 +128,53 @@
         const response = await fetch('/brightness');
         const data = await response.json();
         syncBrightnessControls(data.brightness);
+      }
+
+      async function refreshPages() {
+        const response = await fetch('/pages');
+        const data = await response.json();
+
+        pageList.innerHTML = '';
+
+        for (const page of data.pages) {
+          const item = document.createElement('li');
+
+          const title = document.createElement('strong');
+          title.textContent = page.index + ': ' + page.name;
+          item.appendChild(title);
+
+          if (page.active) {
+            item.appendChild(document.createTextNode(' (active)'));
+          }
+
+          item.appendChild(document.createElement('br'));
+
+          const showButton = document.createElement('button');
+          showButton.type = 'button';
+          showButton.textContent = 'Show page';
+          showButton.disabled = page.active;
+          showButton.addEventListener('click', async () => {
+            showButton.disabled = true;
+            pageStatus.textContent = 'Changing page...';
+
+            try {
+              const showResponse = await fetch('/page', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ index: page.index }),
+              });
+              pageStatus.textContent = await showResponse.text();
+              await refreshPages();
+            } catch (error) {
+              pageStatus.textContent = 'Page change request failed';
+            } finally {
+              showButton.disabled = false;
+            }
+          });
+          item.appendChild(showButton);
+
+          pageList.appendChild(item);
+        }
       }
 
       async function refreshSprites() {
@@ -326,6 +386,7 @@
       });
 
       refreshBrightness();
+      refreshPages();
       refreshSprites();
     </script>
   </body>

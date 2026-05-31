@@ -139,6 +139,67 @@ bool parse_brightness_request(uint8_t &brightness, String &error) {
   return false;
 }
 
+bool parse_non_negative_int_arg(const String &value, int &result) {
+  if (value.length() == 0) {
+    return false;
+  }
+
+  for (size_t i = 0; i < value.length(); ++i) {
+    if (!isDigit(value[i])) {
+      return false;
+    }
+  }
+
+  result = value.toInt();
+  return true;
+}
+
+bool parse_page_request(size_t &index, String &error) {
+  int parsed = -1;
+
+  if (server.hasArg("plain") && server.arg("plain").length() > 0) {
+    JsonDocument doc;
+    DeserializationError jsonError = deserializeJson(doc, server.arg("plain"));
+    if (jsonError) {
+      error = "Invalid JSON";
+      return false;
+    }
+
+    JsonVariant value = doc["index"];
+    if (value.isNull()) {
+      value = doc["page"];
+    }
+
+    if (!value.is<int>()) {
+      error = "Missing page index";
+      return false;
+    }
+
+    parsed = value.as<int>();
+  } else if (server.hasArg("index")) {
+    if (!parse_non_negative_int_arg(server.arg("index"), parsed)) {
+      error = "Invalid page index";
+      return false;
+    }
+  } else if (server.hasArg("page")) {
+    if (!parse_non_negative_int_arg(server.arg("page"), parsed)) {
+      error = "Invalid page index";
+      return false;
+    }
+  } else {
+    error = "Missing page index";
+    return false;
+  }
+
+  if (parsed < 0 || static_cast<size_t>(parsed) >= ui_get_page_count()) {
+    error = "Page index out of range";
+    return false;
+  }
+
+  index = static_cast<size_t>(parsed);
+  return true;
+}
+
 String sprite_file_path(const String &name) {
   return String(kSpriteDir) + "/" + name + ".gif";
 }
@@ -478,6 +539,46 @@ void handleBrightnessPost() {
 
   display_control_set_brightness(brightness, true);
   server.send(200, "text/plain", "Brightness set to " + String(brightness));
+}
+
+void handlePagesGet() {
+  JsonDocument doc;
+  const size_t pageCount = ui_get_page_count();
+  const int32_t activeIndex = ui_get_active_page_index();
+
+  doc["count"] = pageCount;
+  doc["activeIndex"] = activeIndex;
+  JsonArray pages = doc["pages"].to<JsonArray>();
+
+  for (size_t i = 0; i < pageCount; ++i) {
+    JsonObject page = pages.add<JsonObject>();
+    page["index"] = i;
+    page["name"] = ui_get_page_name(i);
+    page["active"] = activeIndex == static_cast<int32_t>(i);
+  }
+
+  String response;
+  serializeJson(doc, response);
+  server.send(200, "application/json", response);
+}
+
+void handlePagePost() {
+  size_t index = 0;
+  String error;
+  if (!parse_page_request(index, error)) {
+    server.send(400, "text/plain", error);
+    return;
+  }
+
+  if (!ui_set_active_page_index(index, true)) {
+    server.send(400, "text/plain", "Could not change page");
+    return;
+  }
+
+  server.send(
+      200,
+      "text/plain",
+      "Showing page " + String(index) + ": " + String(ui_get_page_name(index)));
 }
 
 void handleBeep() {
@@ -849,6 +950,8 @@ void wifi_config_init() {
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/brightness", HTTP_GET, handleBrightnessGet);
   server.on("/brightness", HTTP_POST, handleBrightnessPost);
+  server.on("/pages", HTTP_GET, handlePagesGet);
+  server.on("/page", HTTP_POST, handlePagePost);
   server.on("/beep", HTTP_POST, handleBeep);
   server.on("/sprites", HTTP_GET, handleSpritesList);
   server.on("/sprites", HTTP_DELETE, handleSpriteDelete);

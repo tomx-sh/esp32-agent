@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+
 void ui_create();
 void ui_set_network_info(const char *ssid, const char *url);
 void ui_set_status_message(const char *title, const char *message);
@@ -9,3 +12,7 @@ void ui_clear_pet_sprite(const char *message);
 bool ui_show_pet_message(const char *message);
 void ui_clear_pet_message();
 bool ui_is_pet_page_active();
+size_t ui_get_page_count();
+const char *ui_get_page_name(size_t index);
+int32_t ui_get_active_page_index();
+bool ui_set_active_page_index(size_t index, bool animate);

@@ -322,3 +322,42 @@ void ui_clear_pet_message() {
 bool ui_is_pet_page_active() {
   return petPageActive;
 }
+
+size_t ui_get_page_count() {
+  return sizeof(kPages) / sizeof(kPages[0]);
+}
+
+const char *ui_get_page_name(size_t index) {
+  if (index >= ui_get_page_count()) {
+    return "";
+  }
+
+  return kPages[index].name;
+}
+
+int32_t ui_get_active_page_index() {
+  if (pageView == nullptr) {
+    return -1;
+  }
+
+  lv_obj_t *activeTile = lv_tileview_get_tile_active(pageView);
+  if (activeTile == nullptr) {
+    return -1;
+  }
+
+  return lv_obj_get_index(activeTile);
+}
+
+bool ui_set_active_page_index(size_t index, bool animate) {
+  if (pageView == nullptr || index >= ui_get_page_count()) {
+    return false;
+  }
+
+  lv_tileview_set_tile_by_index(
+      pageView,
+      static_cast<uint32_t>(index),
+      0,
+      animate ? LV_ANIM_ON : LV_ANIM_OFF);
+  updatePetPageActiveState();
+  return true;
+}
