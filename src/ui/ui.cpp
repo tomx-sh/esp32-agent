@@ -21,13 +21,68 @@ lv_obj_t *petStatusLabel = nullptr;
 lv_obj_t *codexUsageStatusLabel = nullptr;
 lv_obj_t *codexUsageBar = nullptr;
 lv_obj_t *codexUsageLabel = nullptr;
+lv_obj_t *codexResetLabel = nullptr;
+lv_timer_t *codexResetTimer = nullptr;
 bool spritePageActive = false;
 uint8_t codexUsagePercent = 0;
+uint32_t codexResetMinutes = 0;
 char petSpritePath[96] = "";
 char petSpriteName[40] = "";
 
-constexpr size_t kPetPageIndex = 0;
-constexpr size_t kCodexUsagePageIndex = 3;
+constexpr size_t kCodexUsagePageIndex = 0;
+constexpr size_t kPetPageIndex = 1;
+constexpr uint32_t kCodexGaugeEmptyColor = 0x303030;
+
+void updateCodexResetLabel() {
+  if (codexResetLabel == nullptr) {
+    return;
+  }
+
+  if (codexResetMinutes == 0) {
+    lv_obj_add_flag(codexResetLabel, LV_OBJ_FLAG_HIDDEN);
+    return;
+  }
+
+  const uint32_t days = codexResetMinutes / (24 * 60);
+  const uint32_t hours = (codexResetMinutes / 60) % 24;
+  const uint32_t minutes = codexResetMinutes % 60;
+
+  if (days > 0) {
+    lv_label_set_text_fmt(
+        codexResetLabel,
+        "#%06lx resets# %lud %luh",
+        static_cast<unsigned long>(kCodexGaugeEmptyColor),
+        days,
+        hours);
+  } else if (hours > 0) {
+    lv_label_set_text_fmt(
+        codexResetLabel,
+        "#%06lx resets# %luh %lum",
+        static_cast<unsigned long>(kCodexGaugeEmptyColor),
+        hours,
+        minutes);
+  } else {
+    lv_label_set_text_fmt(
+        codexResetLabel,
+        "#%06lx resets# %lum",
+        static_cast<unsigned long>(kCodexGaugeEmptyColor),
+        minutes);
+  }
+
+  lv_obj_remove_flag(codexResetLabel, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_foreground(codexResetLabel);
+}
+
+void handleCodexResetTimer(lv_timer_t *timer) {
+  if (codexResetMinutes > 0) {
+    --codexResetMinutes;
+    updateCodexResetLabel();
+  }
+
+  if (codexResetMinutes == 0) {
+    lv_timer_pause(timer);
+  }
+}
 
 void configureLabel(lv_obj_t *label, const lv_font_t *font, lv_text_align_t align) {
   lv_obj_set_width(label, lv_pct(100));
@@ -174,6 +229,9 @@ bool loadPendingPetSprite() {
   lv_obj_remove_flag(gif, LV_OBJ_FLAG_HIDDEN);
   lv_obj_align(gif, LV_ALIGN_CENTER, 0, 0);
   lv_obj_add_flag(statusLabel, LV_OBJ_FLAG_HIDDEN);
+  if (activePageIndex() == static_cast<int32_t>(kCodexUsagePageIndex)) {
+    updateCodexResetLabel();
+  }
   if (activePageIndex() == static_cast<int32_t>(kPetPageIndex)) {
     pet_message_init(petContent);
   }
@@ -298,6 +356,21 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   configureLabel(codexUsageStatusLabel, &lv_font_montserrat_20, LV_TEXT_ALIGN_CENTER);
   lv_obj_align(codexUsageStatusLabel, LV_ALIGN_CENTER, 0, 0);
 
+  codexResetLabel = lv_label_create(codexUsageGifContent);
+  lv_obj_set_width(codexResetLabel, lv_pct(100));
+  lv_obj_set_style_text_color(codexResetLabel, lv_color_white(), 0);
+  lv_obj_set_style_text_font(codexResetLabel, &jetbrains_mono_24, 0);
+  lv_obj_set_style_text_align(codexResetLabel, LV_TEXT_ALIGN_LEFT, 0);
+  lv_label_set_recolor(codexResetLabel, true);
+  lv_label_set_long_mode(codexResetLabel, LV_LABEL_LONG_CLIP);
+  lv_obj_align(codexResetLabel, LV_ALIGN_TOP_LEFT, 0, 0);
+  updateCodexResetLabel();
+
+  codexResetTimer = lv_timer_create(handleCodexResetTimer, 60 * 1000, nullptr);
+  if (codexResetTimer != nullptr && codexResetMinutes == 0) {
+    lv_timer_pause(codexResetTimer);
+  }
+
   lv_obj_t *gaugeRow = lv_obj_create(content);
   lv_obj_remove_style_all(gaugeRow);
   lv_obj_remove_flag(gaugeRow, LV_OBJ_FLAG_SCROLLABLE);
@@ -315,7 +388,7 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_obj_set_flex_grow(codexUsageBar, 1);
   lv_obj_set_style_radius(codexUsageBar, LV_RADIUS_CIRCLE, LV_PART_MAIN);
   lv_obj_set_style_radius(codexUsageBar, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
-  lv_obj_set_style_bg_color(codexUsageBar, lv_color_hex(0x303030), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(codexUsageBar, lv_color_hex(kCodexGaugeEmptyColor), LV_PART_MAIN);
   lv_obj_set_style_bg_opa(codexUsageBar, LV_OPA_COVER, LV_PART_MAIN);
   lv_obj_set_style_bg_color(codexUsageBar, lv_color_white(), LV_PART_INDICATOR);
   lv_obj_set_style_bg_opa(codexUsageBar, LV_OPA_COVER, LV_PART_INDICATOR);
@@ -341,10 +414,10 @@ void buildCodexUsagePage(lv_obj_t *parent) {
 }
 
 constexpr UiPageDefinition kPages[] = {
+    {"Codex Usage", buildCodexUsagePage},
     {"Pet", buildPetPage},
     {"Wi-Fi", buildWifiConfigPage},
     {"Hello", buildHelloPage},
-    {"Codex Usage", buildCodexUsagePage},
 };
 }
 
@@ -455,6 +528,26 @@ void ui_set_codex_usage_percent(uint8_t percent) {
 
   if (codexUsageLabel != nullptr) {
     lv_label_set_text_fmt(codexUsageLabel, "%u%%", codexUsagePercent);
+  }
+}
+
+uint32_t ui_get_codex_reset_minutes() {
+  return codexResetMinutes;
+}
+
+void ui_set_codex_reset_minutes(uint32_t minutes) {
+  codexResetMinutes = minutes;
+  updateCodexResetLabel();
+
+  if (codexResetTimer == nullptr) {
+    return;
+  }
+
+  lv_timer_reset(codexResetTimer);
+  if (codexResetMinutes > 0) {
+    lv_timer_resume(codexResetTimer);
+  } else {
+    lv_timer_pause(codexResetTimer);
   }
 }
 

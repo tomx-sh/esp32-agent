@@ -27,6 +27,7 @@ constexpr size_t kMaxSpriteUploadBytes = 512 * 1024;
 constexpr uint16_t kMaxSpriteWidth = 240;
 constexpr uint16_t kMaxSpriteHeight = 240;
 constexpr size_t kMaxPetMessageLength = 240;
+constexpr uint32_t kMaxCodexResetMinutes = 365 * 24 * 60;
 constexpr char kSpriteDir[] = "/sprites";
 constexpr char kSpriteUploadPath[] = "/sprites/.upload.gif";
 constexpr char kDefaultSpriteName[] = "idle";
@@ -159,7 +160,27 @@ bool parse_percent_arg(const String &value, uint8_t &result) {
   return true;
 }
 
-bool parse_codex_usage_request(uint8_t &percent, String &error) {
+bool parse_reset_minutes_arg(const String &value, uint32_t &result) {
+  if (value.length() == 0) {
+    return false;
+  }
+
+  for (size_t i = 0; i < value.length(); ++i) {
+    if (!isDigit(value[i])) {
+      return false;
+    }
+  }
+
+  const unsigned long parsed = value.toInt();
+  if (parsed > kMaxCodexResetMinutes) {
+    return false;
+  }
+
+  result = static_cast<uint32_t>(parsed);
+  return true;
+}
+
+bool parse_codex_usage_request(uint8_t &percent, uint32_t &resetMinutes, String &error) {
   if (server.hasArg("plain") && server.arg("plain").length() > 0) {
     JsonDocument doc;
     DeserializationError jsonError = deserializeJson(doc, server.arg("plain"));
@@ -185,14 +206,42 @@ bool parse_codex_usage_request(uint8_t &percent, String &error) {
     }
 
     percent = static_cast<uint8_t>(parsed);
+
+    JsonVariant resetValue = doc["resetMinutes"];
+    if (!resetValue.isNull()) {
+      if (!resetValue.is<int>()) {
+        error = "Reset minutes must be a number";
+        return false;
+      }
+
+      const int parsedResetMinutes = resetValue.as<int>();
+      if (parsedResetMinutes < 0 || parsedResetMinutes > static_cast<int>(kMaxCodexResetMinutes)) {
+        error = "Reset minutes must be between 0 and 525600";
+        return false;
+      }
+
+      resetMinutes = static_cast<uint32_t>(parsedResetMinutes);
+    }
     return true;
   }
 
   if (server.hasArg("percent") && parse_percent_arg(server.arg("percent"), percent)) {
+    if (
+        server.hasArg("resetMinutes") &&
+        !parse_reset_minutes_arg(server.arg("resetMinutes"), resetMinutes)) {
+      error = "Reset minutes must be between 0 and 525600";
+      return false;
+    }
     return true;
   }
 
   if (server.hasArg("value") && parse_percent_arg(server.arg("value"), percent)) {
+    if (
+        server.hasArg("resetMinutes") &&
+        !parse_reset_minutes_arg(server.arg("resetMinutes"), resetMinutes)) {
+      error = "Reset minutes must be between 0 and 525600";
+      return false;
+    }
     return true;
   }
 
@@ -605,8 +654,10 @@ void handleBrightnessPost() {
 void handleCodexUsageGet() {
   JsonDocument doc;
   doc["percent"] = ui_get_codex_usage_percent();
+  doc["resetMinutes"] = ui_get_codex_reset_minutes();
   doc["min"] = 0;
   doc["max"] = 100;
+  doc["resetMinutesMax"] = kMaxCodexResetMinutes;
 
   String response;
   serializeJson(doc, response);
@@ -615,14 +666,19 @@ void handleCodexUsageGet() {
 
 void handleCodexUsagePost() {
   uint8_t percent = 0;
+  uint32_t resetMinutes = ui_get_codex_reset_minutes();
   String error;
-  if (!parse_codex_usage_request(percent, error)) {
+  if (!parse_codex_usage_request(percent, resetMinutes, error)) {
     server.send(400, "text/plain", error);
     return;
   }
 
   ui_set_codex_usage_percent(percent);
-  server.send(200, "text/plain", "Codex usage set to " + String(percent) + "%");
+  ui_set_codex_reset_minutes(resetMinutes);
+  server.send(
+      200,
+      "text/plain",
+      "Codex usage set to " + String(percent) + "% (resets in " + String(resetMinutes) + "m)");
 }
 
 void handlePagesGet() {

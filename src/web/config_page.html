@@ -73,6 +73,9 @@
         <label for="codex-usage">Usage</label>
         <input id="codex-usage" name="percent" type="range" min="0" max="100" value="0">
         <input id="codex-usage-number" type="number" min="0" max="100" value="0">
+        <br/>
+        <label for="codex-reset-minutes">Resets in (minutes)</label>
+        <input id="codex-reset-minutes" type="number" min="0" max="525600" value="0">
         <button type="submit">Set usage</button>
       </form>
       <p id="codex-usage-status"></p>
@@ -80,7 +83,7 @@
       <p>Programmatic commands:</p>
       <code>curl {{BASE_URL}}/codex/usage</code>
       <br/>
-      <code>curl -X POST {{BASE_URL}}/codex/usage -H 'Content-Type: application/json' -d '{"percent":42}'</code>
+      <code>curl -X POST {{BASE_URL}}/codex/usage -H 'Content-Type: application/json' -d '{"percent":42,"resetMinutes":125}'</code>
     </section>
 
     <section>
@@ -118,6 +121,7 @@
       const codexUsageForm = document.getElementById('codex-usage-form');
       const codexUsage = document.getElementById('codex-usage');
       const codexUsageNumber = document.getElementById('codex-usage-number');
+      const codexResetMinutes = document.getElementById('codex-reset-minutes');
       const spriteForm = document.getElementById('sprite-form');
       const spriteList = document.getElementById('sprite-list');
       const spriteEmpty = document.getElementById('sprite-empty');
@@ -160,6 +164,7 @@
         const response = await fetch('/codex/usage');
         const data = await response.json();
         syncCodexUsageControls(data.percent);
+        codexResetMinutes.value = Math.max(0, Number(data.resetMinutes) || 0);
       }
 
       async function refreshPages() {
@@ -385,13 +390,14 @@
       codexUsageForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         const percent = Number(codexUsage.value);
+        const resetMinutes = Number(codexResetMinutes.value);
         codexUsageStatus.textContent = 'Setting Codex usage...';
 
         try {
           const response = await fetch('/codex/usage', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ percent }),
+            body: JSON.stringify({ percent, resetMinutes }),
           });
           codexUsageStatus.textContent = await response.text();
         } catch (error) {
