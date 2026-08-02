@@ -19,7 +19,7 @@ npx --yes sharp-cli@5.2.0 \
   -i assets/icons/lucide/flask-round.svg \
   -o "$temporary_dir/{name}.png" \
   -f png \
-  resize 24 24
+  resize 36 36
 
 uv run \
   --with 'pypng==0.20220715.0' \
@@ -29,11 +29,11 @@ uv run \
   --cf A8 \
   --compress NONE \
   --output src/ui/icons \
-  --name flask_round_24 \
+  --name flask_round_36 \
   "$temporary_dir/flask-round.png"
 
 # PlatformIO exposes LVGL as <lvgl.h>; normalize the converter's fallback include.
-generated_icon=src/ui/icons/flask_round_24.c
-normalized_icon="$temporary_dir/flask_round_24.c"
+generated_icon=src/ui/icons/flask_round_36.c
+normalized_icon="$temporary_dir/flask_round_36.c"
 sed 's|#include "lvgl/lvgl.h"|#include <lvgl.h>|' "$generated_icon" > "$normalized_icon"
 mv "$normalized_icon" "$generated_icon"

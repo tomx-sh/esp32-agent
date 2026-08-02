@@ -147,8 +147,10 @@ curl -X POST "$ESP32_AGENT_URL/pet" -H 'Content-Type: application/json' -d '{"na
 curl -X POST "$ESP32_AGENT_URL/pet" -H 'Content-Type: application/json' -d '{"name":"codex-failed","ttlMs":5000}'
 curl -X POST "$ESP32_AGENT_URL/pet" -H 'Content-Type: application/json' -d '{"name":"codex-idle","ttlMs":0}'
 curl -X POST "$ESP32_AGENT_URL/pet/message" -H 'Content-Type: application/json' -d '{"message":"Codex needs approval","ttlMs":5000}'
-curl -X POST "$ESP32_AGENT_URL/codex/usage" -H 'Content-Type: application/json' -d '{"percent":42}'
+curl -X POST "$ESP32_AGENT_URL/codex/usage" -H 'Content-Type: application/json' -d '{"percent":42,"resetAt":1786147200,"resetCredits":2}'
 ```
+
+`resetAt` is required and uses the same Unix-seconds timestamp shape as Codex. Send `0` when no reset is available. The device synchronizes a UTC clock over SNTP and renders resets under 24 hours as a countdown; longer resets use an abbreviated UTC calendar date.
 
 ## Claude Code event hooks
 

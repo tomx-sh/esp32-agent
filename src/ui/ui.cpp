@@ -1,12 +1,13 @@
 #include "ui.h"
 
 #include <cstdio>
+#include <ctime>
 
 #include <lvgl.h>
 
 #include "debug/debug_log.h"
 #include "fonts/jetbrains_mono_36.h"
-#include "icons/flask_round_24.h"
+#include "icons/flask_round_36.h"
 #include "page_view.h"
 #include "pet_message.h"
 
@@ -28,7 +29,7 @@ lv_obj_t *codexResetCreditsLabel = nullptr;
 lv_timer_t *codexResetTimer = nullptr;
 bool spritePageActive = false;
 uint8_t codexUsagePercent = 0;
-uint32_t codexResetMinutes = 0;
+uint64_t codexResetAt = 0;
 uint16_t codexResetCredits = 0;
 char petSpritePath[96] = "";
 char petSpriteName[40] = "";
@@ -36,41 +37,65 @@ char petSpriteName[40] = "";
 constexpr size_t kCodexUsagePageIndex = 0;
 constexpr size_t kPetPageIndex = 1;
 constexpr uint32_t kCodexGaugeEmptyColor = 0x303030;
+constexpr time_t kValidClockEpoch = 1700000000;
+constexpr uint64_t kAbsoluteResetDateThresholdSeconds = 24 * 60 * 60;
+
+void hideCodexResetLabel() {
+  lv_obj_add_flag(codexResetLabel, LV_OBJ_FLAG_HIDDEN);
+}
 
 void updateCodexResetLabel() {
   if (codexResetLabel == nullptr) {
     return;
   }
 
-  if (codexResetMinutes == 0) {
-    lv_obj_add_flag(codexResetLabel, LV_OBJ_FLAG_HIDDEN);
+  const time_t now = time(nullptr);
+  if (
+      codexResetAt == 0 ||
+      now < kValidClockEpoch ||
+      codexResetAt <= static_cast<uint64_t>(now)) {
+    hideCodexResetLabel();
     return;
   }
 
-  const uint32_t days = codexResetMinutes / (24 * 60);
-  const uint32_t hours = (codexResetMinutes / 60) % 24;
-  const uint32_t minutes = codexResetMinutes % 60;
+  const uint64_t remainingSeconds = codexResetAt - static_cast<uint64_t>(now);
 
-  if (days > 0) {
+  if (remainingSeconds >= kAbsoluteResetDateThresholdSeconds) {
+    const time_t resetTime = static_cast<time_t>(codexResetAt);
+    tm utcReset = {};
+    if (gmtime_r(&resetTime, &utcReset) == nullptr) {
+      hideCodexResetLabel();
+      return;
+    }
+
+    constexpr const char *kMonthNames[] = {
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     lv_label_set_text_fmt(
         codexResetLabel,
-        "#%06lx resets# %lud %luh",
+        "#%06lx resets# %s %d",
         static_cast<unsigned long>(kCodexGaugeEmptyColor),
-        days,
-        hours);
-  } else if (hours > 0) {
-    lv_label_set_text_fmt(
-        codexResetLabel,
-        "#%06lx resets# %luh %lum",
-        static_cast<unsigned long>(kCodexGaugeEmptyColor),
-        hours,
-        minutes);
+        kMonthNames[utcReset.tm_mon],
+        utcReset.tm_mday);
   } else {
-    lv_label_set_text_fmt(
-        codexResetLabel,
-        "#%06lx resets# %lum",
-        static_cast<unsigned long>(kCodexGaugeEmptyColor),
-        minutes);
+    const uint32_t remainingMinutes = static_cast<uint32_t>((remainingSeconds + 59) / 60);
+    const uint32_t hours = remainingMinutes / 60;
+    const uint32_t minutes = remainingMinutes % 60;
+
+    if (hours > 0) {
+      lv_label_set_text_fmt(
+          codexResetLabel,
+          "#%06lx resets# %luh %lum",
+          static_cast<unsigned long>(kCodexGaugeEmptyColor),
+          static_cast<unsigned long>(hours),
+          static_cast<unsigned long>(minutes));
+    } else {
+      lv_label_set_text_fmt(
+          codexResetLabel,
+          "#%06lx resets# %lum",
+          static_cast<unsigned long>(kCodexGaugeEmptyColor),
+          static_cast<unsigned long>(minutes));
+    }
   }
 
   lv_obj_remove_flag(codexResetLabel, LV_OBJ_FLAG_HIDDEN);
@@ -92,12 +117,12 @@ void updateCodexResetCreditsLabel() {
 }
 
 void handleCodexResetTimer(lv_timer_t *timer) {
-  if (codexResetMinutes > 0) {
-    --codexResetMinutes;
-    updateCodexResetLabel();
-  }
+  updateCodexResetLabel();
 
-  if (codexResetMinutes == 0) {
+  const time_t now = time(nullptr);
+  if (
+      codexResetAt == 0 ||
+      (now >= kValidClockEpoch && codexResetAt <= static_cast<uint64_t>(now))) {
     lv_timer_pause(timer);
   }
 }
@@ -388,18 +413,18 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   codexResetCreditsRow = lv_obj_create(codexUsageGifContent);
   lv_obj_remove_style_all(codexResetCreditsRow);
   lv_obj_remove_flag(codexResetCreditsRow, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_size(codexResetCreditsRow, LV_SIZE_CONTENT, 44);
+  lv_obj_set_size(codexResetCreditsRow, LV_SIZE_CONTENT, 36);
   lv_obj_set_style_pad_column(codexResetCreditsRow, 8, 0);
   lv_obj_set_flex_flow(codexResetCreditsRow, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(
       codexResetCreditsRow,
       LV_FLEX_ALIGN_START,
-      LV_FLEX_ALIGN_CENTER,
+      LV_FLEX_ALIGN_START,
       LV_FLEX_ALIGN_CENTER);
   lv_obj_align(codexResetCreditsRow, LV_ALIGN_TOP_RIGHT, 0, 0);
 
   lv_obj_t *resetCreditsIcon = lv_image_create(codexResetCreditsRow);
-  lv_image_set_src(resetCreditsIcon, &flask_round_24);
+  lv_image_set_src(resetCreditsIcon, &flask_round_36);
   lv_obj_set_style_image_recolor(
       resetCreditsIcon,
       lv_color_hex(kCodexGaugeEmptyColor),
@@ -424,7 +449,7 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   updateCodexResetCreditsLabel();
 
   codexResetTimer = lv_timer_create(handleCodexResetTimer, 60 * 1000, nullptr);
-  if (codexResetTimer != nullptr && codexResetMinutes == 0) {
+  if (codexResetTimer != nullptr && codexResetAt == 0) {
     lv_timer_pause(codexResetTimer);
   }
 
@@ -588,12 +613,12 @@ void ui_set_codex_usage_percent(uint8_t percent) {
   }
 }
 
-uint32_t ui_get_codex_reset_minutes() {
-  return codexResetMinutes;
+uint64_t ui_get_codex_reset_at() {
+  return codexResetAt;
 }
 
-void ui_set_codex_reset_minutes(uint32_t minutes) {
-  codexResetMinutes = minutes;
+void ui_set_codex_reset_at(uint64_t resetAt) {
+  codexResetAt = resetAt;
   updateCodexResetLabel();
 
   if (codexResetTimer == nullptr) {
@@ -601,7 +626,7 @@ void ui_set_codex_reset_minutes(uint32_t minutes) {
   }
 
   lv_timer_reset(codexResetTimer);
-  if (codexResetMinutes > 0) {
+  if (codexResetAt > 0) {
     lv_timer_resume(codexResetTimer);
   } else {
     lv_timer_pause(codexResetTimer);

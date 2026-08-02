@@ -5,6 +5,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 #include <cstring>
+#include <ctime>
 #include <lvgl.h>
 
 #include "app_network.h"
@@ -27,8 +28,9 @@ constexpr size_t kMaxSpriteUploadBytes = 512 * 1024;
 constexpr uint16_t kMaxSpriteWidth = 240;
 constexpr uint16_t kMaxSpriteHeight = 240;
 constexpr size_t kMaxPetMessageLength = 240;
-constexpr uint32_t kMaxCodexResetMinutes = 365 * 24 * 60;
 constexpr uint16_t kMaxCodexResetCredits = 999;
+constexpr char kPrimaryNtpServer[] = "pool.ntp.org";
+constexpr char kSecondaryNtpServer[] = "time.nist.gov";
 constexpr char kSpriteDir[] = "/sprites";
 constexpr char kSpriteUploadPath[] = "/sprites/.upload.gif";
 constexpr char kDefaultSpriteName[] = "idle";
@@ -161,23 +163,24 @@ bool parse_percent_arg(const String &value, uint8_t &result) {
   return true;
 }
 
-bool parse_reset_minutes_arg(const String &value, uint32_t &result) {
+bool parse_reset_at_arg(const String &value, uint64_t &result) {
   if (value.length() == 0) {
     return false;
   }
 
+  uint64_t parsed = 0;
   for (size_t i = 0; i < value.length(); ++i) {
     if (!isDigit(value[i])) {
       return false;
     }
+    const uint8_t digit = static_cast<uint8_t>(value[i] - '0');
+    if (parsed > (UINT64_MAX - digit) / 10) {
+      return false;
+    }
+    parsed = parsed * 10 + digit;
   }
 
-  const unsigned long parsed = value.toInt();
-  if (parsed > kMaxCodexResetMinutes) {
-    return false;
-  }
-
-  result = static_cast<uint32_t>(parsed);
+  result = parsed;
   return true;
 }
 
@@ -203,7 +206,7 @@ bool parse_reset_credits_arg(const String &value, uint16_t &result) {
 
 bool parse_codex_usage_request(
     uint8_t &percent,
-    uint32_t &resetMinutes,
+    uint64_t &resetAt,
     uint16_t &resetCredits,
     String &error) {
   if (server.hasArg("plain") && server.arg("plain").length() > 0) {
@@ -215,10 +218,6 @@ bool parse_codex_usage_request(
     }
 
     JsonVariant value = doc["percent"];
-    if (value.isNull()) {
-      value = doc["value"];
-    }
-
     if (!value.is<int>()) {
       error = "Missing usage percent";
       return false;
@@ -232,21 +231,12 @@ bool parse_codex_usage_request(
 
     percent = static_cast<uint8_t>(parsed);
 
-    JsonVariant resetValue = doc["resetMinutes"];
-    if (!resetValue.isNull()) {
-      if (!resetValue.is<int>()) {
-        error = "Reset minutes must be a number";
-        return false;
-      }
-
-      const int parsedResetMinutes = resetValue.as<int>();
-      if (parsedResetMinutes < 0 || parsedResetMinutes > static_cast<int>(kMaxCodexResetMinutes)) {
-        error = "Reset minutes must be between 0 and 525600";
-        return false;
-      }
-
-      resetMinutes = static_cast<uint32_t>(parsedResetMinutes);
+    JsonVariant resetValue = doc["resetAt"];
+    if (!resetValue.is<uint64_t>()) {
+      error = "Missing or invalid resetAt Unix timestamp";
+      return false;
     }
+    resetAt = resetValue.as<uint64_t>();
 
     JsonVariant resetCreditsValue = doc["resetCredits"];
     if (!resetCreditsValue.isNull()) {
@@ -267,26 +257,8 @@ bool parse_codex_usage_request(
   }
 
   if (server.hasArg("percent") && parse_percent_arg(server.arg("percent"), percent)) {
-    if (
-        server.hasArg("resetMinutes") &&
-        !parse_reset_minutes_arg(server.arg("resetMinutes"), resetMinutes)) {
-      error = "Reset minutes must be between 0 and 525600";
-      return false;
-    }
-    if (
-        server.hasArg("resetCredits") &&
-        !parse_reset_credits_arg(server.arg("resetCredits"), resetCredits)) {
-      error = "Reset credits must be between 0 and 999";
-      return false;
-    }
-    return true;
-  }
-
-  if (server.hasArg("value") && parse_percent_arg(server.arg("value"), percent)) {
-    if (
-        server.hasArg("resetMinutes") &&
-        !parse_reset_minutes_arg(server.arg("resetMinutes"), resetMinutes)) {
-      error = "Reset minutes must be between 0 and 525600";
+    if (!server.hasArg("resetAt") || !parse_reset_at_arg(server.arg("resetAt"), resetAt)) {
+      error = "Missing or invalid resetAt Unix timestamp";
       return false;
     }
     if (
@@ -707,11 +679,10 @@ void handleBrightnessPost() {
 void handleCodexUsageGet() {
   JsonDocument doc;
   doc["percent"] = ui_get_codex_usage_percent();
-  doc["resetMinutes"] = ui_get_codex_reset_minutes();
+  doc["resetAt"] = ui_get_codex_reset_at();
   doc["resetCredits"] = ui_get_codex_reset_credits();
   doc["min"] = 0;
   doc["max"] = 100;
-  doc["resetMinutesMax"] = kMaxCodexResetMinutes;
   doc["resetCreditsMax"] = kMaxCodexResetCredits;
 
   String response;
@@ -721,22 +692,29 @@ void handleCodexUsageGet() {
 
 void handleCodexUsagePost() {
   uint8_t percent = 0;
-  uint32_t resetMinutes = ui_get_codex_reset_minutes();
+  uint64_t resetAt = ui_get_codex_reset_at();
   uint16_t resetCredits = ui_get_codex_reset_credits();
   String error;
-  if (!parse_codex_usage_request(percent, resetMinutes, resetCredits, error)) {
+  if (!parse_codex_usage_request(percent, resetAt, resetCredits, error)) {
     server.send(400, "text/plain", error);
     return;
   }
 
   ui_set_codex_usage_percent(percent);
-  ui_set_codex_reset_minutes(resetMinutes);
+  ui_set_codex_reset_at(resetAt);
   ui_set_codex_reset_credits(resetCredits);
+  char response[144];
+  snprintf(
+      response,
+      sizeof(response),
+      "Codex usage set to %u%% (resetAt %llu, %u reset credits)",
+      static_cast<unsigned int>(percent),
+      static_cast<unsigned long long>(resetAt),
+      static_cast<unsigned int>(resetCredits));
   server.send(
       200,
       "text/plain",
-      "Codex usage set to " + String(percent) + "% (resets in " + String(resetMinutes) +
-          "m, " + String(resetCredits) + " reset credits)");
+      response);
 }
 
 void handlePagesGet() {
@@ -1137,6 +1115,7 @@ void wifi_config_init() {
   WiFi.enableIPv6();
   WiFi.persistent(true);
   WiFi.begin();
+  configTime(0, 0, kPrimaryNtpServer, kSecondaryNtpServer);
 
   if (connect_station()) {
     stationSsid = WiFi.SSID();

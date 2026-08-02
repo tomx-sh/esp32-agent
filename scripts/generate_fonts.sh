@@ -6,7 +6,7 @@ cd "$project_dir"
 
 npx --yes lv_font_conv@1.5.3 \
   --font assets/fonts/JetBrainsMono-Medium.ttf \
-  --symbols '0123456789%dhm erst' \
+  --symbols '0123456789%dhm erstJanFebMarAprMayJunJulAugSepOctNovDec' \
   --size 36 \
   --bpp 4 \
   --format lvgl \
