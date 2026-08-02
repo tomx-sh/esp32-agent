@@ -40,8 +40,8 @@ constexpr size_t kCodexUsagePageIndex = 0;
 constexpr size_t kPetPageIndex = 1;
 constexpr uint32_t kCodexGaugeEmptyColor = 0x303030;
 constexpr int32_t kCodexResetCreditsRowHeight = 36;
-constexpr int32_t kCodexContextArcSize = 84;
-constexpr int32_t kCodexContextArcWidth = 10;
+constexpr int32_t kCodexContextArcSize = 64;
+constexpr int32_t kCodexContextArcWidth = 8;
 constexpr int32_t kCodexGaugeRowHeight = 52;
 constexpr int32_t kCodexGridColumns[] = {
     kCodexContextArcSize,
@@ -49,8 +49,8 @@ constexpr int32_t kCodexGridColumns[] = {
     kCodexContextArcSize,
     LV_GRID_TEMPLATE_LAST};
 constexpr int32_t kCodexGridRows[] = {
-    kCodexResetCreditsRowHeight,
     LV_GRID_FR(1),
+    kCodexResetCreditsRowHeight,
     kCodexGaugeRowHeight,
     LV_GRID_TEMPLATE_LAST};
 constexpr time_t kValidClockEpoch = 1700000000;
@@ -436,7 +436,7 @@ void buildCodexUsagePage(lv_obj_t *parent) {
       0,
       3,
       LV_GRID_ALIGN_STRETCH,
-      0,
+      1,
       1);
 
   codexResetLabel = lv_label_create(topRow);
@@ -507,7 +507,7 @@ void buildCodexUsagePage(lv_obj_t *parent) {
       1,
       1,
       LV_GRID_ALIGN_STRETCH,
-      1,
+      0,
       1);
 
   codexUsageStatusLabel = lv_label_create(codexUsageGifContent);
@@ -547,8 +547,8 @@ void buildCodexUsagePage(lv_obj_t *parent) {
       LV_GRID_ALIGN_CENTER,
       0,
       1,
-      LV_GRID_ALIGN_CENTER,
-      1,
+      LV_GRID_ALIGN_END,
+      0,
       1);
   updateCodexContextArc();
 
