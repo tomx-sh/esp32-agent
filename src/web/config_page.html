@@ -83,10 +83,22 @@
       </form>
       <p id="codex-usage-status"></p>
 
+      <form id="codex-context-form">
+        <label for="codex-context">Context remaining</label>
+        <input id="codex-context" name="remainingPercent" type="range" min="0" max="100" value="100">
+        <input id="codex-context-number" type="number" min="0" max="100" value="100">
+        <button type="submit">Set context</button>
+      </form>
+      <p id="codex-context-status"></p>
+
       <p>Programmatic commands:</p>
       <code>curl {{BASE_URL}}/codex/usage</code>
       <br/>
       <code>curl -X POST {{BASE_URL}}/codex/usage -H 'Content-Type: application/json' -d '{"percent":42,"resetAt":1786147200,"resetCredits":2}'</code>
+      <br/>
+      <code>curl {{BASE_URL}}/codex/context</code>
+      <br/>
+      <code>curl -X POST {{BASE_URL}}/codex/context -H 'Content-Type: application/json' -d '{"remainingPercent":68}'</code>
     </section>
 
     <section>
@@ -126,6 +138,9 @@
       const codexUsageNumber = document.getElementById('codex-usage-number');
       const codexResetAt = document.getElementById('codex-reset-at');
       const codexResetCredits = document.getElementById('codex-reset-credits');
+      const codexContextForm = document.getElementById('codex-context-form');
+      const codexContext = document.getElementById('codex-context');
+      const codexContextNumber = document.getElementById('codex-context-number');
       const spriteForm = document.getElementById('sprite-form');
       const spriteList = document.getElementById('sprite-list');
       const spriteEmpty = document.getElementById('sprite-empty');
@@ -136,6 +151,7 @@
       const audioStatus = document.getElementById('audio-status');
       const displayStatus = document.getElementById('display-status');
       const codexUsageStatus = document.getElementById('codex-usage-status');
+      const codexContextStatus = document.getElementById('codex-context-status');
       const pageStatus = document.getElementById('page-status');
       const spriteStatus = document.getElementById('sprite-status');
 
@@ -164,6 +180,12 @@
         codexUsageNumber.value = normalized;
       }
 
+      function syncCodexContextControls(value) {
+        const normalized = Math.max(0, Math.min(100, Number(value) || 0));
+        codexContext.value = normalized;
+        codexContextNumber.value = normalized;
+      }
+
       function formatResetAtInput(resetAt) {
         const date = new Date(Number(resetAt) * 1000);
         if (!(Number(resetAt) > 0) || Number.isNaN(date.getTime())) return '';
@@ -183,6 +205,12 @@
         syncCodexUsageControls(data.percent);
         codexResetAt.value = formatResetAtInput(data.resetAt);
         codexResetCredits.value = Math.max(0, Number(data.resetCredits) || 0);
+      }
+
+      async function refreshCodexContext() {
+        const response = await fetch('/codex/context');
+        const data = await response.json();
+        syncCodexContextControls(data.remainingPercent);
       }
 
       async function refreshPages() {
@@ -424,6 +452,31 @@
         }
       });
 
+      codexContext.addEventListener('input', () => {
+        syncCodexContextControls(codexContext.value);
+      });
+
+      codexContextNumber.addEventListener('input', () => {
+        syncCodexContextControls(codexContextNumber.value);
+      });
+
+      codexContextForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const remainingPercent = Number(codexContext.value);
+        codexContextStatus.textContent = 'Setting Codex context...';
+
+        try {
+          const response = await fetch('/codex/context', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ remainingPercent }),
+          });
+          codexContextStatus.textContent = await response.text();
+        } catch (error) {
+          codexContextStatus.textContent = 'Codex context request failed';
+        }
+      });
+
       forget.addEventListener('click', async () => {
         forget.disabled = true;
         wifiActionStatus.textContent = 'Forgetting WiFi...';
@@ -469,6 +522,7 @@
 
       refreshBrightness();
       refreshCodexUsage();
+      refreshCodexContext();
       refreshPages();
       refreshSprites();
     </script>

@@ -26,9 +26,11 @@ lv_obj_t *codexUsageLabel = nullptr;
 lv_obj_t *codexResetLabel = nullptr;
 lv_obj_t *codexResetCreditsRow = nullptr;
 lv_obj_t *codexResetCreditsLabel = nullptr;
+lv_obj_t *codexContextArc = nullptr;
 lv_timer_t *codexResetTimer = nullptr;
 bool spritePageActive = false;
 uint8_t codexUsagePercent = 0;
+uint8_t codexContextRemainingPercent = 100;
 uint64_t codexResetAt = 0;
 uint16_t codexResetCredits = 0;
 char petSpritePath[96] = "";
@@ -38,6 +40,19 @@ constexpr size_t kCodexUsagePageIndex = 0;
 constexpr size_t kPetPageIndex = 1;
 constexpr uint32_t kCodexGaugeEmptyColor = 0x303030;
 constexpr int32_t kCodexResetCreditsRowHeight = 36;
+constexpr int32_t kCodexContextArcSize = 84;
+constexpr int32_t kCodexContextArcWidth = 10;
+constexpr int32_t kCodexGaugeRowHeight = 52;
+constexpr int32_t kCodexGridColumns[] = {
+    kCodexContextArcSize,
+    LV_GRID_FR(1),
+    kCodexContextArcSize,
+    LV_GRID_TEMPLATE_LAST};
+constexpr int32_t kCodexGridRows[] = {
+    kCodexResetCreditsRowHeight,
+    LV_GRID_FR(1),
+    kCodexGaugeRowHeight,
+    LV_GRID_TEMPLATE_LAST};
 constexpr time_t kValidClockEpoch = 1700000000;
 constexpr uint64_t kAbsoluteResetDateThresholdSeconds = 24 * 60 * 60;
 
@@ -126,6 +141,15 @@ void updateCodexResetCreditsLabel() {
   if (codexResetCreditsRow != nullptr) {
     lv_obj_move_foreground(codexResetCreditsRow);
   }
+}
+
+void updateCodexContextArc() {
+  if (codexContextArc == nullptr) {
+    return;
+  }
+
+  lv_arc_set_value(codexContextArc, codexContextRemainingPercent);
+  lv_obj_move_foreground(codexContextArc);
 }
 
 void handleCodexResetTimer(lv_timer_t *timer) {
@@ -287,6 +311,7 @@ bool loadPendingPetSprite() {
   if (activePageIndex() == static_cast<int32_t>(kCodexUsagePageIndex)) {
     updateCodexResetLabel();
     updateCodexResetCreditsLabel();
+    updateCodexContextArc();
   }
   if (activePageIndex() == static_cast<int32_t>(kPetPageIndex)) {
     pet_message_init(petContent);
@@ -398,21 +423,23 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_obj_set_style_pad_right(content, 12, 0);
   lv_obj_set_style_pad_top(content, 20, 0);
   lv_obj_set_style_pad_bottom(content, 20, 0);
+  lv_obj_set_style_pad_column(content, 12, 0);
   lv_obj_set_style_pad_row(content, 14, 0);
-  lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_grid_dsc_array(content, kCodexGridColumns, kCodexGridRows);
 
-  codexUsageGifContent = lv_obj_create(content);
-  lv_obj_remove_style_all(codexUsageGifContent);
-  lv_obj_remove_flag(codexUsageGifContent, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_width(codexUsageGifContent, lv_pct(100));
-  lv_obj_set_flex_grow(codexUsageGifContent, 1);
+  lv_obj_t *topRow = lv_obj_create(content);
+  lv_obj_remove_style_all(topRow);
+  lv_obj_remove_flag(topRow, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_grid_cell(
+      topRow,
+      LV_GRID_ALIGN_STRETCH,
+      0,
+      3,
+      LV_GRID_ALIGN_STRETCH,
+      0,
+      1);
 
-  codexUsageStatusLabel = lv_label_create(codexUsageGifContent);
-  lv_label_set_text(codexUsageStatusLabel, "No pet sprite loaded");
-  configureLabel(codexUsageStatusLabel, &lv_font_montserrat_32, LV_TEXT_ALIGN_CENTER);
-  lv_obj_align(codexUsageStatusLabel, LV_ALIGN_CENTER, 0, 0);
-
-  codexResetLabel = lv_label_create(codexUsageGifContent);
+  codexResetLabel = lv_label_create(topRow);
   lv_obj_set_width(codexResetLabel, lv_pct(100));
   lv_obj_set_style_text_color(codexResetLabel, lv_color_white(), 0);
   lv_obj_set_style_text_font(codexResetLabel, &jetbrains_mono_36, 0);
@@ -425,7 +452,7 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_obj_align(codexResetLabel, LV_ALIGN_TOP_LEFT, 0, resetTextTopOffset);
   updateCodexResetLabel();
 
-  codexResetCreditsRow = lv_obj_create(codexUsageGifContent);
+  codexResetCreditsRow = lv_obj_create(topRow);
   lv_obj_remove_style_all(codexResetCreditsRow);
   lv_obj_remove_flag(codexResetCreditsRow, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_size(
@@ -470,10 +497,72 @@ void buildCodexUsagePage(lv_obj_t *parent) {
     lv_timer_pause(codexResetTimer);
   }
 
+  codexUsageGifContent = lv_obj_create(content);
+  lv_obj_remove_style_all(codexUsageGifContent);
+  lv_obj_remove_flag(codexUsageGifContent, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_remove_flag(codexUsageGifContent, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+  lv_obj_set_grid_cell(
+      codexUsageGifContent,
+      LV_GRID_ALIGN_STRETCH,
+      1,
+      1,
+      LV_GRID_ALIGN_STRETCH,
+      1,
+      1);
+
+  codexUsageStatusLabel = lv_label_create(codexUsageGifContent);
+  lv_label_set_text(codexUsageStatusLabel, "No pet sprite loaded");
+  configureLabel(codexUsageStatusLabel, &lv_font_montserrat_32, LV_TEXT_ALIGN_CENTER);
+  lv_obj_align(codexUsageStatusLabel, LV_ALIGN_CENTER, 0, 0);
+
+  codexContextArc = lv_arc_create(content);
+  lv_obj_set_size(codexContextArc, kCodexContextArcSize, kCodexContextArcSize);
+  lv_obj_remove_flag(codexContextArc, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_remove_style(codexContextArc, nullptr, LV_PART_KNOB);
+  lv_obj_set_style_arc_color(
+      codexContextArc,
+      lv_color_hex(kCodexGaugeEmptyColor),
+      LV_PART_MAIN);
+  lv_obj_set_style_arc_opa(codexContextArc, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_arc_width(
+      codexContextArc,
+      kCodexContextArcWidth,
+      LV_PART_MAIN);
+  lv_obj_set_style_arc_rounded(codexContextArc, true, LV_PART_MAIN);
+  lv_obj_set_style_arc_color(
+      codexContextArc,
+      lv_color_white(),
+      LV_PART_INDICATOR);
+  lv_obj_set_style_arc_opa(codexContextArc, LV_OPA_COVER, LV_PART_INDICATOR);
+  lv_obj_set_style_arc_width(
+      codexContextArc,
+      kCodexContextArcWidth,
+      LV_PART_INDICATOR);
+  lv_obj_set_style_arc_rounded(codexContextArc, true, LV_PART_INDICATOR);
+  lv_arc_set_rotation(codexContextArc, 270);
+  lv_arc_set_bg_angles(codexContextArc, 0, 360);
+  lv_arc_set_range(codexContextArc, 0, 100);
+  lv_obj_set_grid_cell(
+      codexContextArc,
+      LV_GRID_ALIGN_CENTER,
+      0,
+      1,
+      LV_GRID_ALIGN_CENTER,
+      1,
+      1);
+  updateCodexContextArc();
+
   lv_obj_t *gaugeRow = lv_obj_create(content);
   lv_obj_remove_style_all(gaugeRow);
   lv_obj_remove_flag(gaugeRow, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_size(gaugeRow, lv_pct(100), 52);
+  lv_obj_set_grid_cell(
+      gaugeRow,
+      LV_GRID_ALIGN_STRETCH,
+      0,
+      3,
+      LV_GRID_ALIGN_STRETCH,
+      2,
+      1);
   lv_obj_set_style_pad_column(gaugeRow, 12, 0);
   lv_obj_set_flex_flow(gaugeRow, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(
@@ -657,6 +746,15 @@ uint16_t ui_get_codex_reset_credits() {
 void ui_set_codex_reset_credits(uint16_t credits) {
   codexResetCredits = credits;
   updateCodexResetCreditsLabel();
+}
+
+uint8_t ui_get_codex_context_remaining_percent() {
+  return codexContextRemainingPercent;
+}
+
+void ui_set_codex_context_remaining_percent(uint8_t percent) {
+  codexContextRemainingPercent = percent > 100 ? 100 : percent;
+  updateCodexContextArc();
 }
 
 size_t ui_get_page_count() {

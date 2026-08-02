@@ -148,9 +148,18 @@ curl -X POST "$ESP32_AGENT_URL/pet" -H 'Content-Type: application/json' -d '{"na
 curl -X POST "$ESP32_AGENT_URL/pet" -H 'Content-Type: application/json' -d '{"name":"codex-idle","ttlMs":0}'
 curl -X POST "$ESP32_AGENT_URL/pet/message" -H 'Content-Type: application/json' -d '{"message":"Codex needs approval","ttlMs":5000}'
 curl -X POST "$ESP32_AGENT_URL/codex/usage" -H 'Content-Type: application/json' -d '{"percent":42,"resetAt":1786147200,"resetCredits":2}'
+curl -X POST "$ESP32_AGENT_URL/codex/context" -H 'Content-Type: application/json' -d '{"remainingPercent":68}'
 ```
 
 `resetAt` is required and uses the same Unix-seconds timestamp shape as Codex. Send `0` when no reset is available. The device synchronizes a UTC clock over SNTP and renders resets under 24 hours as a countdown; longer resets use an abbreviated UTC calendar date.
+
+`remainingPercent` is the active thread's remaining context capacity, not an account usage limit. Codex App Server emits `thread/tokenUsage/updated` with `tokenUsage.last.totalTokens` and `tokenUsage.modelContextWindow`. Codex calculates the displayed percentage after reserving a 12,000-token baseline:
+
+```text
+effectiveWindow = modelContextWindow - 12000
+used = max(last.totalTokens - 12000, 0)
+remainingPercent = round(100 * max(effectiveWindow - used, 0) / effectiveWindow)
+```
 
 ## Claude Code event hooks
 

@@ -274,6 +274,35 @@ bool parse_codex_usage_request(
   return false;
 }
 
+bool parse_codex_context_request(uint8_t &remainingPercent, String &error) {
+  if (!server.hasArg("plain") || server.arg("plain").length() == 0) {
+    error = "Expected a JSON body";
+    return false;
+  }
+
+  JsonDocument doc;
+  DeserializationError jsonError = deserializeJson(doc, server.arg("plain"));
+  if (jsonError) {
+    error = "Invalid JSON";
+    return false;
+  }
+
+  JsonVariant value = doc["remainingPercent"];
+  if (!value.is<int>()) {
+    error = "Missing remainingPercent";
+    return false;
+  }
+
+  const int parsed = value.as<int>();
+  if (parsed < 0 || parsed > 100) {
+    error = "remainingPercent must be between 0 and 100";
+    return false;
+  }
+
+  remainingPercent = static_cast<uint8_t>(parsed);
+  return true;
+}
+
 bool parse_non_negative_int_arg(const String &value, int &result) {
   if (value.length() == 0) {
     return false;
@@ -717,6 +746,32 @@ void handleCodexUsagePost() {
       response);
 }
 
+void handleCodexContextGet() {
+  JsonDocument doc;
+  doc["remainingPercent"] = ui_get_codex_context_remaining_percent();
+  doc["min"] = 0;
+  doc["max"] = 100;
+
+  String response;
+  serializeJson(doc, response);
+  server.send(200, "application/json", response);
+}
+
+void handleCodexContextPost() {
+  uint8_t remainingPercent = 0;
+  String error;
+  if (!parse_codex_context_request(remainingPercent, error)) {
+    server.send(400, "text/plain", error);
+    return;
+  }
+
+  ui_set_codex_context_remaining_percent(remainingPercent);
+  server.send(
+      200,
+      "text/plain",
+      "Codex context remaining set to " + String(remainingPercent) + "%");
+}
+
 void handlePagesGet() {
   JsonDocument doc;
   const size_t pageCount = ui_get_page_count();
@@ -1133,6 +1188,8 @@ void wifi_config_init() {
   server.on("/brightness", HTTP_POST, handleBrightnessPost);
   server.on("/codex/usage", HTTP_GET, handleCodexUsageGet);
   server.on("/codex/usage", HTTP_POST, handleCodexUsagePost);
+  server.on("/codex/context", HTTP_GET, handleCodexContextGet);
+  server.on("/codex/context", HTTP_POST, handleCodexContextPost);
   server.on("/pages", HTTP_GET, handlePagesGet);
   server.on("/page", HTTP_POST, handlePagePost);
   server.on("/beep", HTTP_POST, handleBeep);

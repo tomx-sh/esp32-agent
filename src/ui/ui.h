@@ -18,6 +18,8 @@ uint64_t ui_get_codex_reset_at();
 void ui_set_codex_reset_at(uint64_t resetAt);
 uint16_t ui_get_codex_reset_credits();
 void ui_set_codex_reset_credits(uint16_t credits);
+uint8_t ui_get_codex_context_remaining_percent();
+void ui_set_codex_context_remaining_percent(uint8_t percent);
 size_t ui_get_page_count();
 const char *ui_get_page_name(size_t index);
 int32_t ui_get_active_page_index();
