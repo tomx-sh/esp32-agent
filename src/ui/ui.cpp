@@ -5,6 +5,7 @@
 #include <lvgl.h>
 
 #include "debug/debug_log.h"
+#include "fonts/jetbrains_mono_24.h"
 #include "page_view.h"
 #include "pet_message.h"
 
@@ -326,14 +327,14 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_text_get_size(
       &maximumPercentSize,
       "100%",
-      &lv_font_unscii_16,
+      &jetbrains_mono_24,
       0,
       0,
       LV_COORD_MAX,
       LV_TEXT_FLAG_NONE);
   lv_obj_set_width(codexUsageLabel, maximumPercentSize.x + 4);
   lv_obj_set_style_text_color(codexUsageLabel, lv_color_white(), 0);
-  lv_obj_set_style_text_font(codexUsageLabel, &lv_font_unscii_16, 0);
+  lv_obj_set_style_text_font(codexUsageLabel, &jetbrains_mono_24, 0);
   lv_obj_set_style_text_align(codexUsageLabel, LV_TEXT_ALIGN_RIGHT, 0);
   lv_label_set_long_mode(codexUsageLabel, LV_LABEL_LONG_CLIP);
   lv_label_set_text_fmt(codexUsageLabel, "%u%%", codexUsagePercent);
