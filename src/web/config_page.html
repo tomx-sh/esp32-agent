@@ -69,6 +69,34 @@
 
     <section>
       <h2>Codex usage</h2>
+
+      <h3>Message</h3>
+      <form id="codex-message-form">
+        <label for="codex-message">Message</label>
+        <input id="codex-message" name="message" maxlength="240" autocomplete="off">
+        <label><input id="codex-message-muted" type="checkbox"> Muted</label>
+        <button type="submit">Set message</button>
+      </form>
+      <p id="codex-message-status"></p>
+      <p>Programmatic commands:</p>
+      <code>curl {{BASE_URL}}/codex/message</code>
+      <br/>
+      <code>curl -X POST {{BASE_URL}}/codex/message -H 'Content-Type: application/json' -d '{"message":"Building firmware","muted":true}'</code>
+
+      <h3>Context</h3>
+      <form id="codex-context-form">
+        <label for="codex-context">Context remaining</label>
+        <input id="codex-context" name="remainingPercent" type="range" min="0" max="100" value="100">
+        <input id="codex-context-number" type="number" min="0" max="100" value="100">
+        <button type="submit">Set context</button>
+      </form>
+      <p id="codex-context-status"></p>
+      <p>Programmatic commands:</p>
+      <code>curl {{BASE_URL}}/codex/context</code>
+      <br/>
+      <code>curl -X POST {{BASE_URL}}/codex/context -H 'Content-Type: application/json' -d '{"remainingPercent":68}'</code>
+
+      <h3>Credits</h3>
       <form id="codex-usage-form">
         <label for="codex-usage">Usage</label>
         <input id="codex-usage" name="percent" type="range" min="0" max="100" value="0">
@@ -82,23 +110,10 @@
         <button type="submit">Set usage</button>
       </form>
       <p id="codex-usage-status"></p>
-
-      <form id="codex-context-form">
-        <label for="codex-context">Context remaining</label>
-        <input id="codex-context" name="remainingPercent" type="range" min="0" max="100" value="100">
-        <input id="codex-context-number" type="number" min="0" max="100" value="100">
-        <button type="submit">Set context</button>
-      </form>
-      <p id="codex-context-status"></p>
-
       <p>Programmatic commands:</p>
       <code>curl {{BASE_URL}}/codex/usage</code>
       <br/>
       <code>curl -X POST {{BASE_URL}}/codex/usage -H 'Content-Type: application/json' -d '{"percent":42,"resetAt":1786147200,"resetCredits":2}'</code>
-      <br/>
-      <code>curl {{BASE_URL}}/codex/context</code>
-      <br/>
-      <code>curl -X POST {{BASE_URL}}/codex/context -H 'Content-Type: application/json' -d '{"remainingPercent":68}'</code>
     </section>
 
     <section>
@@ -138,6 +153,9 @@
       const codexUsageNumber = document.getElementById('codex-usage-number');
       const codexResetAt = document.getElementById('codex-reset-at');
       const codexResetCredits = document.getElementById('codex-reset-credits');
+      const codexMessageForm = document.getElementById('codex-message-form');
+      const codexMessage = document.getElementById('codex-message');
+      const codexMessageMuted = document.getElementById('codex-message-muted');
       const codexContextForm = document.getElementById('codex-context-form');
       const codexContext = document.getElementById('codex-context');
       const codexContextNumber = document.getElementById('codex-context-number');
@@ -151,6 +169,7 @@
       const audioStatus = document.getElementById('audio-status');
       const displayStatus = document.getElementById('display-status');
       const codexUsageStatus = document.getElementById('codex-usage-status');
+      const codexMessageStatus = document.getElementById('codex-message-status');
       const codexContextStatus = document.getElementById('codex-context-status');
       const pageStatus = document.getElementById('page-status');
       const spriteStatus = document.getElementById('sprite-status');
@@ -211,6 +230,14 @@
         const response = await fetch('/codex/context');
         const data = await response.json();
         syncCodexContextControls(data.remainingPercent);
+      }
+
+      async function refreshCodexMessage() {
+        const response = await fetch('/codex/message');
+        const data = await response.json();
+        codexMessage.value = data.message || '';
+        codexMessageMuted.checked = data.muted === true;
+        codexMessage.maxLength = Number(data.maxLength) || 240;
       }
 
       async function refreshPages() {
@@ -456,6 +483,25 @@
         syncCodexContextControls(codexContext.value);
       });
 
+      codexMessageForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        codexMessageStatus.textContent = 'Setting Codex message...';
+
+        try {
+          const response = await fetch('/codex/message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: codexMessage.value,
+              muted: codexMessageMuted.checked,
+            }),
+          });
+          codexMessageStatus.textContent = await response.text();
+        } catch (error) {
+          codexMessageStatus.textContent = 'Codex message request failed';
+        }
+      });
+
       codexContextNumber.addEventListener('input', () => {
         syncCodexContextControls(codexContextNumber.value);
       });
@@ -522,6 +568,7 @@
 
       refreshBrightness();
       refreshCodexUsage();
+      refreshCodexMessage();
       refreshCodexContext();
       refreshPages();
       refreshSprites();

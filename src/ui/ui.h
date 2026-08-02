@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+constexpr size_t kMaxCodexMessageLength = 240;
+
 void ui_create();
 void ui_set_network_info(const char *ssid, const char *url);
 void ui_set_status_message(const char *title, const char *message);
@@ -14,6 +16,9 @@ void ui_clear_pet_message();
 bool ui_is_pet_page_active();
 uint8_t ui_get_codex_usage_percent();
 void ui_set_codex_usage_percent(uint8_t percent);
+const char *ui_get_codex_message();
+bool ui_get_codex_message_muted();
+void ui_set_codex_message(const char *message, bool muted);
 uint64_t ui_get_codex_reset_at();
 void ui_set_codex_reset_at(uint64_t resetAt);
 uint16_t ui_get_codex_reset_credits();

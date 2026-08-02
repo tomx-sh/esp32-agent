@@ -148,10 +148,19 @@ curl -X POST "$ESP32_AGENT_URL/pet" -H 'Content-Type: application/json' -d '{"na
 curl -X POST "$ESP32_AGENT_URL/pet" -H 'Content-Type: application/json' -d '{"name":"codex-idle","ttlMs":0}'
 curl -X POST "$ESP32_AGENT_URL/pet/message" -H 'Content-Type: application/json' -d '{"message":"Codex needs approval","ttlMs":5000}'
 curl -X POST "$ESP32_AGENT_URL/codex/usage" -H 'Content-Type: application/json' -d '{"percent":42,"resetAt":1786147200,"resetCredits":2}'
+curl -X POST "$ESP32_AGENT_URL/codex/message" -H 'Content-Type: application/json' -d '{"message":"Building firmware","muted":true}'
 curl -X POST "$ESP32_AGENT_URL/codex/context" -H 'Content-Type: application/json' -d '{"remainingPercent":68}'
 ```
 
 `resetAt` is required and uses the same Unix-seconds timestamp shape as Codex. Send `0` when no reset is available. The device synchronizes a UTC clock over SNTP and renders resets under 24 hours as a countdown; longer resets use an abbreviated UTC calendar date.
+
+`POST /codex/message` sets the one-line message overlaid at the top of the Codex Usage page. Set `muted` to `true` to use the same muted gray as the usage gauge; when omitted, the current muted state is preserved. Messages may contain up to 240 bytes; line breaks are rejected, text wider than the display is truncated with an ellipsis, and an empty string clears the message. `GET /codex/message` returns the current message, muted state, and maximum length. The values are held in memory and reset when the device restarts.
+
+The usage-page labels share the generated 36 px JetBrains Mono font. Its printable ASCII glyphs are converted ahead of time to LVGL's native C format with `scripts/generate_fonts.sh`. The generated bitmap remains uncompressed: at this size it keeps rendering fast for labels that are always visible, while avoiding a runtime font engine and filesystem reads. Regenerate it after replacing the source TTF:
+
+```sh
+./scripts/generate_fonts.sh
+```
 
 `remainingPercent` is the active thread's remaining context capacity, not an account usage limit. Codex App Server emits `thread/tokenUsage/updated` with `tokenUsage.last.totalTokens` and `tokenUsage.modelContextWindow`. Codex calculates the displayed percentage after reserving a 12,000-token baseline:
 

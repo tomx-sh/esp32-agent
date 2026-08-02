@@ -746,6 +746,60 @@ void handleCodexUsagePost() {
       response);
 }
 
+void handleCodexMessageGet() {
+  JsonDocument doc;
+  doc["message"] = ui_get_codex_message();
+  doc["muted"] = ui_get_codex_message_muted();
+  doc["maxLength"] = kMaxCodexMessageLength;
+
+  String response;
+  serializeJson(doc, response);
+  server.send(200, "application/json", response);
+}
+
+void handleCodexMessagePost() {
+  JsonDocument doc;
+  DeserializationError jsonError = deserializeJson(doc, server.arg("plain"));
+  if (jsonError) {
+    server.send(400, "text/plain", "Invalid JSON");
+    return;
+  }
+
+  JsonVariant messageValue = doc["message"];
+  if (!messageValue.is<const char *>()) {
+    server.send(400, "text/plain", "Missing message");
+    return;
+  }
+
+  const char *message = messageValue.as<const char *>();
+  const size_t messageLength = strlen(message);
+  if (messageLength > kMaxCodexMessageLength) {
+    server.send(400, "text/plain", "Message is too long");
+    return;
+  }
+
+  if (strchr(message, '\n') != nullptr || strchr(message, '\r') != nullptr) {
+    server.send(400, "text/plain", "Message must be one line");
+    return;
+  }
+
+  bool muted = ui_get_codex_message_muted();
+  JsonVariant mutedValue = doc["muted"];
+  if (!mutedValue.isNull()) {
+    if (!mutedValue.is<bool>()) {
+      server.send(400, "text/plain", "Muted must be a boolean");
+      return;
+    }
+    muted = mutedValue.as<bool>();
+  }
+
+  ui_set_codex_message(message, muted);
+  server.send(
+      200,
+      "text/plain",
+      messageLength == 0 ? "Codex message cleared" : "Codex message set");
+}
+
 void handleCodexContextGet() {
   JsonDocument doc;
   doc["remainingPercent"] = ui_get_codex_context_remaining_percent();
@@ -1188,6 +1242,8 @@ void wifi_config_init() {
   server.on("/brightness", HTTP_POST, handleBrightnessPost);
   server.on("/codex/usage", HTTP_GET, handleCodexUsageGet);
   server.on("/codex/usage", HTTP_POST, handleCodexUsagePost);
+  server.on("/codex/message", HTTP_GET, handleCodexMessageGet);
+  server.on("/codex/message", HTTP_POST, handleCodexMessagePost);
   server.on("/codex/context", HTTP_GET, handleCodexContextGet);
   server.on("/codex/context", HTTP_POST, handleCodexContextPost);
   server.on("/pages", HTTP_GET, handlePagesGet);
