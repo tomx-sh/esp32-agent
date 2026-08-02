@@ -1,6 +1,7 @@
 #include "ui.h"
 
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 
 #include <lvgl.h>
@@ -29,6 +30,8 @@ lv_obj_t *codexResetCreditsRow = nullptr;
 lv_obj_t *codexResetCreditsLabel = nullptr;
 lv_obj_t *codexContextArc = nullptr;
 lv_timer_t *codexResetTimer = nullptr;
+lv_font_t codexMessageFont = {};
+lv_font_t codexMessageFallbackFont = {};
 bool spritePageActive = false;
 uint8_t codexUsagePercent = 0;
 uint8_t codexContextRemainingPercent = 100;
@@ -42,6 +45,10 @@ char petSpriteName[40] = "";
 constexpr size_t kCodexUsagePageIndex = 0;
 constexpr size_t kPetPageIndex = 1;
 constexpr uint32_t kCodexGaugeEmptyColor = 0x303030;
+constexpr int32_t kCodexMessageShadowRadius = 3;
+constexpr int32_t kCodexMessageShadowOffsetX = 1;
+constexpr int32_t kCodexMessageShadowOffsetY = 2;
+constexpr char kCodexMessageEllipsis[] = "\xE2\x80\xA6";
 constexpr int32_t kCodexResetCreditsRowHeight = 36;
 constexpr int32_t kCodexContextArcSize = 64;
 constexpr int32_t kCodexContextArcWidth = 8;
@@ -68,6 +75,88 @@ int32_t getDigitVisualTopOffset(const lv_font_t *font, int32_t targetHeight) {
   const int32_t glyphTop =
       lv_font_get_line_height(font) - font->base_line - digit.box_h - digit.ofs_y;
   return (targetHeight - digit.box_h) / 2 - glyphTop;
+}
+
+int32_t getCodexMessageTextWidth(const char *text) {
+  lv_point_t size = {};
+  lv_text_get_size(
+      &size,
+      text,
+      &codexMessageFont,
+      lv_obj_get_style_text_letter_space(codexMessageLabel, LV_PART_MAIN),
+      0,
+      LV_COORD_MAX,
+      LV_TEXT_FLAG_NONE);
+  return size.x;
+}
+
+size_t previousUtf8Boundary(const char *text, size_t end) {
+  if (end == 0) {
+    return 0;
+  }
+
+  size_t index = end - 1;
+  while (
+      index > 0 &&
+      (static_cast<uint8_t>(text[index]) & 0xC0) == 0x80) {
+    --index;
+  }
+  return index;
+}
+
+void updateCodexMessageText() {
+  if (codexMessageLabel == nullptr) {
+    return;
+  }
+
+  lv_obj_update_layout(codexMessageLabel);
+  const int32_t availableWidth = lv_obj_get_content_width(codexMessageLabel);
+  if (
+      availableWidth <= 0 ||
+      getCodexMessageTextWidth(codexMessage) <= availableWidth) {
+    lv_label_set_text(codexMessageLabel, codexMessage);
+    return;
+  }
+
+  char truncated[kMaxCodexMessageLength + sizeof(kCodexMessageEllipsis)] = {};
+  size_t prefixLength = strlen(codexMessage);
+  do {
+    prefixLength = previousUtf8Boundary(codexMessage, prefixLength);
+    memcpy(truncated, codexMessage, prefixLength);
+    memcpy(
+        truncated + prefixLength,
+        kCodexMessageEllipsis,
+        sizeof(kCodexMessageEllipsis));
+  } while (
+      prefixLength > 0 &&
+      getCodexMessageTextWidth(truncated) > availableWidth);
+
+  lv_label_set_text(codexMessageLabel, truncated);
+}
+
+void updateCodexMessageAppearance() {
+  if (codexMessageLabel == nullptr) {
+    return;
+  }
+
+  lv_obj_set_style_text_color(
+      codexMessageLabel,
+      codexMessageMuted ? lv_color_hex(kCodexGaugeEmptyColor) : lv_color_white(),
+      0);
+  lv_obj_set_style_drop_shadow_opa(
+      codexMessageLabel,
+      codexMessageMuted ? LV_OPA_TRANSP : LV_OPA_50,
+      0);
+
+  if (codexMessageMuted && codexUsageGifContent != nullptr) {
+    const int32_t messageIndex = lv_obj_get_index(codexMessageLabel);
+    const int32_t gifIndex = lv_obj_get_index(codexUsageGifContent);
+    if (messageIndex > gifIndex) {
+      lv_obj_move_to_index(codexMessageLabel, gifIndex);
+    }
+  } else {
+    lv_obj_move_foreground(codexMessageLabel);
+  }
 }
 
 void hideCodexResetLabel() {
@@ -153,6 +242,7 @@ void updateCodexContextArc() {
 
   lv_arc_set_value(codexContextArc, codexContextRemainingPercent);
   lv_obj_move_foreground(codexContextArc);
+  updateCodexMessageAppearance();
 }
 
 void handleCodexResetTimer(lv_timer_t *timer) {
@@ -608,17 +698,22 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_obj_set_width(codexMessageLabel, lv_pct(100));
   lv_obj_set_height(
       codexMessageLabel,
-      lv_font_get_line_height(&jetbrains_mono_36));
+      lv_font_get_line_height(&codexMessageFont));
   lv_obj_set_style_text_color(
       codexMessageLabel,
       codexMessageMuted ? lv_color_hex(kCodexGaugeEmptyColor) : lv_color_white(),
       0);
-  lv_obj_set_style_text_font(codexMessageLabel, &jetbrains_mono_36, 0);
+  lv_obj_set_style_text_font(codexMessageLabel, &codexMessageFont, 0);
   lv_obj_set_style_text_align(codexMessageLabel, LV_TEXT_ALIGN_LEFT, 0);
-  lv_label_set_long_mode(codexMessageLabel, LV_LABEL_LONG_DOT);
-  lv_label_set_text(codexMessageLabel, codexMessage);
+  lv_obj_set_style_drop_shadow_radius(codexMessageLabel, kCodexMessageShadowRadius, 0);
+  lv_obj_set_style_drop_shadow_offset_x(codexMessageLabel, kCodexMessageShadowOffsetX, 0);
+  lv_obj_set_style_drop_shadow_offset_y(codexMessageLabel, kCodexMessageShadowOffsetY, 0);
+  lv_obj_set_style_drop_shadow_color(codexMessageLabel, lv_color_black(), 0);
+  lv_obj_set_style_drop_shadow_quality(codexMessageLabel, LV_BLUR_QUALITY_SPEED, 0);
+  lv_label_set_long_mode(codexMessageLabel, LV_LABEL_LONG_WRAP);
   lv_obj_align(codexMessageLabel, LV_ALIGN_TOP_MID, 0, 0);
-  lv_obj_move_foreground(codexMessageLabel);
+  updateCodexMessageText();
+  updateCodexMessageAppearance();
 }
 
 constexpr UiPageDefinition kPages[] = {
@@ -630,6 +725,12 @@ constexpr UiPageDefinition kPages[] = {
 }
 
 void ui_create() {
+  codexMessageFallbackFont = jetbrains_mono_36;
+  codexMessageFallbackFont.line_height = lv_font_montserrat_36.line_height;
+  codexMessageFallbackFont.base_line = lv_font_montserrat_36.base_line;
+  codexMessageFont = lv_font_montserrat_36;
+  codexMessageFont.fallback = &codexMessageFallbackFont;
+
   lv_obj_t *screen = lv_screen_active();
   lv_obj_set_style_bg_color(screen, lv_color_black(), 0);
   pageView = ui_create_page_view(screen, kPages, sizeof(kPages) / sizeof(kPages[0]));
@@ -756,12 +857,8 @@ void ui_set_codex_message(const char *message, bool muted) {
   codexMessageMuted = muted;
 
   if (codexMessageLabel != nullptr) {
-    lv_label_set_text(codexMessageLabel, codexMessage);
-    lv_obj_set_style_text_color(
-        codexMessageLabel,
-        codexMessageMuted ? lv_color_hex(kCodexGaugeEmptyColor) : lv_color_white(),
-        0);
-    lv_obj_move_foreground(codexMessageLabel);
+    updateCodexMessageText();
+    updateCodexMessageAppearance();
   }
 }
 
