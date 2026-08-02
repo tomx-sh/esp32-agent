@@ -68,6 +68,22 @@
     </section>
 
     <section>
+      <h2>Codex usage</h2>
+      <form id="codex-usage-form">
+        <label for="codex-usage">Usage</label>
+        <input id="codex-usage" name="percent" type="range" min="0" max="100" value="0">
+        <input id="codex-usage-number" type="number" min="0" max="100" value="0">
+        <button type="submit">Set usage</button>
+      </form>
+      <p id="codex-usage-status"></p>
+
+      <p>Programmatic commands:</p>
+      <code>curl {{BASE_URL}}/codex/usage</code>
+      <br/>
+      <code>curl -X POST {{BASE_URL}}/codex/usage -H 'Content-Type: application/json' -d '{"percent":42}'</code>
+    </section>
+
+    <section>
       <h2>Pet sprites</h2>
       <form id="sprite-form">
         <label for="sprite-name">Sprite name</label>
@@ -99,6 +115,9 @@
       const brightnessForm = document.getElementById('brightness-form');
       const brightness = document.getElementById('brightness');
       const brightnessNumber = document.getElementById('brightness-number');
+      const codexUsageForm = document.getElementById('codex-usage-form');
+      const codexUsage = document.getElementById('codex-usage');
+      const codexUsageNumber = document.getElementById('codex-usage-number');
       const spriteForm = document.getElementById('sprite-form');
       const spriteList = document.getElementById('sprite-list');
       const spriteEmpty = document.getElementById('sprite-empty');
@@ -108,6 +127,7 @@
       const wifiActionStatus = document.getElementById('wifi-action-status');
       const audioStatus = document.getElementById('audio-status');
       const displayStatus = document.getElementById('display-status');
+      const codexUsageStatus = document.getElementById('codex-usage-status');
       const pageStatus = document.getElementById('page-status');
       const spriteStatus = document.getElementById('sprite-status');
 
@@ -128,6 +148,18 @@
         const response = await fetch('/brightness');
         const data = await response.json();
         syncBrightnessControls(data.brightness);
+      }
+
+      function syncCodexUsageControls(value) {
+        const normalized = Math.max(0, Math.min(100, Number(value) || 0));
+        codexUsage.value = normalized;
+        codexUsageNumber.value = normalized;
+      }
+
+      async function refreshCodexUsage() {
+        const response = await fetch('/codex/usage');
+        const data = await response.json();
+        syncCodexUsageControls(data.percent);
       }
 
       async function refreshPages() {
@@ -342,6 +374,31 @@
         }
       });
 
+      codexUsage.addEventListener('input', () => {
+        syncCodexUsageControls(codexUsage.value);
+      });
+
+      codexUsageNumber.addEventListener('input', () => {
+        syncCodexUsageControls(codexUsageNumber.value);
+      });
+
+      codexUsageForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const percent = Number(codexUsage.value);
+        codexUsageStatus.textContent = 'Setting Codex usage...';
+
+        try {
+          const response = await fetch('/codex/usage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ percent }),
+          });
+          codexUsageStatus.textContent = await response.text();
+        } catch (error) {
+          codexUsageStatus.textContent = 'Codex usage request failed';
+        }
+      });
+
       forget.addEventListener('click', async () => {
         forget.disabled = true;
         wifiActionStatus.textContent = 'Forgetting WiFi...';
@@ -386,6 +443,7 @@
       });
 
       refreshBrightness();
+      refreshCodexUsage();
       refreshPages();
       refreshSprites();
     </script>

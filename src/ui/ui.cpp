@@ -14,13 +14,19 @@ lv_obj_t *ssidLabel = nullptr;
 lv_obj_t *urlLabel = nullptr;
 lv_obj_t *pageView = nullptr;
 lv_obj_t *petContent = nullptr;
+lv_obj_t *codexUsageGifContent = nullptr;
 lv_obj_t *petGif = nullptr;
 lv_obj_t *petStatusLabel = nullptr;
-bool petPageActive = false;
+lv_obj_t *codexUsageStatusLabel = nullptr;
+lv_obj_t *codexUsageBar = nullptr;
+lv_obj_t *codexUsageLabel = nullptr;
+bool spritePageActive = false;
+uint8_t codexUsagePercent = 0;
 char petSpritePath[96] = "";
 char petSpriteName[40] = "";
 
 constexpr size_t kPetPageIndex = 0;
+constexpr size_t kCodexUsagePageIndex = 3;
 
 void configureLabel(lv_obj_t *label, const lv_font_t *font, lv_text_align_t align) {
   lv_obj_set_width(label, lv_pct(100));
@@ -59,13 +65,35 @@ void applyContainScale(lv_obj_t *gif, const char *lvglPath) {
   lv_image_set_scale(gif, containScale);
 }
 
+int32_t activePageIndex() {
+  if (pageView == nullptr) {
+    return -1;
+  }
+
+  lv_obj_t *activeTile = lv_tileview_get_tile_active(pageView);
+  return activeTile == nullptr ? -1 : lv_obj_get_index(activeTile);
+}
+
+lv_obj_t *activeSpriteContent() {
+  return activePageIndex() == static_cast<int32_t>(kCodexUsagePageIndex)
+             ? codexUsageGifContent
+             : petContent;
+}
+
+lv_obj_t *activeSpriteStatusLabel() {
+  return activePageIndex() == static_cast<int32_t>(kCodexUsagePageIndex)
+             ? codexUsageStatusLabel
+             : petStatusLabel;
+}
+
 lv_obj_t *ensurePetGif() {
-  if (petGif != nullptr || petContent == nullptr) {
+  lv_obj_t *content = activeSpriteContent();
+  if (petGif != nullptr || content == nullptr) {
     return petGif;
   }
 
   debug_log_heap("pet-gif-create-before");
-  petGif = lv_gif_create(petContent);
+  petGif = lv_gif_create(content);
   lv_obj_set_size(petGif, lv_pct(100), lv_pct(100));
   lv_image_set_inner_align(petGif, LV_IMAGE_ALIGN_CENTER);
   lv_image_set_antialias(petGif, false);
@@ -96,13 +124,19 @@ void deletePetGif() {
 }
 
 bool loadPendingPetSprite() {
-  if (!petPageActive || petSpritePath[0] == '\0' || petStatusLabel == nullptr) {
+  lv_obj_t *content = activeSpriteContent();
+  lv_obj_t *statusLabel = activeSpriteStatusLabel();
+  if (!spritePageActive || petSpritePath[0] == '\0' || content == nullptr || statusLabel == nullptr) {
     return false;
   }
 
   lv_obj_t *gif = ensurePetGif();
   if (gif == nullptr) {
     return false;
+  }
+
+  if (lv_obj_get_parent(gif) != content) {
+    lv_obj_set_parent(gif, content);
   }
 
   debug_log_heap("pet-gif-set-src-before");
@@ -117,9 +151,9 @@ bool loadPendingPetSprite() {
 
   if (!lv_gif_is_loaded(gif)) {
     lv_obj_add_flag(gif, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(petStatusLabel, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(statusLabel, LV_OBJ_FLAG_HIDDEN);
     lv_label_set_text_fmt(
-        petStatusLabel,
+        statusLabel,
         "Could not load %s",
         petSpriteName[0] == '\0' ? "sprite" : petSpriteName);
     return false;
@@ -138,28 +172,36 @@ bool loadPendingPetSprite() {
 #endif
   lv_obj_remove_flag(gif, LV_OBJ_FLAG_HIDDEN);
   lv_obj_align(gif, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_add_flag(petStatusLabel, LV_OBJ_FLAG_HIDDEN);
-  pet_message_init(petContent);
+  lv_obj_add_flag(statusLabel, LV_OBJ_FLAG_HIDDEN);
+  if (activePageIndex() == static_cast<int32_t>(kPetPageIndex)) {
+    pet_message_init(petContent);
+  }
   return true;
 }
 
-void updatePetPageActiveState() {
+void updateSpritePageActiveState() {
   if (pageView == nullptr) {
     return;
   }
 
-  lv_obj_t *activeTile = lv_tileview_get_tile_active(pageView);
-  const bool active = activeTile != nullptr &&
-                      lv_obj_get_index(activeTile) == static_cast<int32_t>(kPetPageIndex);
-  if (active == petPageActive) {
+  const int32_t activeIndex = activePageIndex();
+  const bool active =
+      activeIndex == static_cast<int32_t>(kPetPageIndex) ||
+      activeIndex == static_cast<int32_t>(kCodexUsagePageIndex);
+  const bool contentChanged =
+      active && petGif != nullptr && lv_obj_get_parent(petGif) != activeSpriteContent();
+  if (active == spritePageActive && !contentChanged) {
     return;
   }
 
-  petPageActive = active;
+  spritePageActive = active;
 #if APP_DEBUG_GRAPHICS
-  Serial.printf("[debug][tile] pet_active=%d active_index=%ld\n", petPageActive, static_cast<long>(activeTile == nullptr ? -1 : lv_obj_get_index(activeTile)));
+  Serial.printf(
+      "[debug][tile] sprite_active=%d active_index=%ld\n",
+      spritePageActive,
+      static_cast<long>(activeIndex));
 #endif
-  if (petPageActive) {
+  if (spritePageActive) {
     loadPendingPetSprite();
   } else {
     hidePetGif();
@@ -167,7 +209,7 @@ void updatePetPageActiveState() {
 }
 
 void handlePageChanged(lv_event_t *) {
-  updatePetPageActiveState();
+  updateSpritePageActiveState();
 }
 
 lv_obj_t *createPageContent(lv_obj_t *parent) {
@@ -232,10 +274,76 @@ void buildPetPage(lv_obj_t *parent) {
   lv_obj_align(petStatusLabel, LV_ALIGN_CENTER, 0, 0);
 }
 
+void buildCodexUsagePage(lv_obj_t *parent) {
+  lv_obj_t *content = lv_obj_create(parent);
+  lv_obj_remove_style_all(content);
+  lv_obj_remove_flag(content, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_size(content, lv_pct(100), lv_pct(100));
+  lv_obj_set_style_pad_left(content, 12, 0);
+  lv_obj_set_style_pad_right(content, 12, 0);
+  lv_obj_set_style_pad_top(content, 20, 0);
+  lv_obj_set_style_pad_bottom(content, 20, 0);
+  lv_obj_set_style_pad_row(content, 14, 0);
+  lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
+
+  codexUsageGifContent = lv_obj_create(content);
+  lv_obj_remove_style_all(codexUsageGifContent);
+  lv_obj_remove_flag(codexUsageGifContent, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_width(codexUsageGifContent, lv_pct(100));
+  lv_obj_set_flex_grow(codexUsageGifContent, 1);
+
+  codexUsageStatusLabel = lv_label_create(codexUsageGifContent);
+  lv_label_set_text(codexUsageStatusLabel, "No pet sprite loaded");
+  configureLabel(codexUsageStatusLabel, &lv_font_montserrat_20, LV_TEXT_ALIGN_CENTER);
+  lv_obj_align(codexUsageStatusLabel, LV_ALIGN_CENTER, 0, 0);
+
+  lv_obj_t *gaugeRow = lv_obj_create(content);
+  lv_obj_remove_style_all(gaugeRow);
+  lv_obj_remove_flag(gaugeRow, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_size(gaugeRow, lv_pct(100), 40);
+  lv_obj_set_style_pad_column(gaugeRow, 12, 0);
+  lv_obj_set_flex_flow(gaugeRow, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(
+      gaugeRow,
+      LV_FLEX_ALIGN_START,
+      LV_FLEX_ALIGN_CENTER,
+      LV_FLEX_ALIGN_CENTER);
+
+  codexUsageBar = lv_bar_create(gaugeRow);
+  lv_obj_set_height(codexUsageBar, 18);
+  lv_obj_set_flex_grow(codexUsageBar, 1);
+  lv_obj_set_style_radius(codexUsageBar, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+  lv_obj_set_style_radius(codexUsageBar, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(codexUsageBar, lv_color_hex(0x303030), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(codexUsageBar, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(codexUsageBar, lv_color_white(), LV_PART_INDICATOR);
+  lv_obj_set_style_bg_opa(codexUsageBar, LV_OPA_COVER, LV_PART_INDICATOR);
+  lv_bar_set_range(codexUsageBar, 0, 100);
+  lv_bar_set_value(codexUsageBar, codexUsagePercent, LV_ANIM_OFF);
+
+  codexUsageLabel = lv_label_create(gaugeRow);
+  lv_point_t maximumPercentSize = {};
+  lv_text_get_size(
+      &maximumPercentSize,
+      "100%",
+      &lv_font_unscii_16,
+      0,
+      0,
+      LV_COORD_MAX,
+      LV_TEXT_FLAG_NONE);
+  lv_obj_set_width(codexUsageLabel, maximumPercentSize.x + 4);
+  lv_obj_set_style_text_color(codexUsageLabel, lv_color_white(), 0);
+  lv_obj_set_style_text_font(codexUsageLabel, &lv_font_unscii_16, 0);
+  lv_obj_set_style_text_align(codexUsageLabel, LV_TEXT_ALIGN_RIGHT, 0);
+  lv_label_set_long_mode(codexUsageLabel, LV_LABEL_LONG_CLIP);
+  lv_label_set_text_fmt(codexUsageLabel, "%u%%", codexUsagePercent);
+}
+
 constexpr UiPageDefinition kPages[] = {
     {"Pet", buildPetPage},
     {"Wi-Fi", buildWifiConfigPage},
     {"Hello", buildHelloPage},
+    {"Codex Usage", buildCodexUsagePage},
 };
 }
 
@@ -244,7 +352,7 @@ void ui_create() {
   lv_obj_set_style_bg_color(screen, lv_color_black(), 0);
   pageView = ui_create_page_view(screen, kPages, sizeof(kPages) / sizeof(kPages[0]));
   lv_obj_add_event_cb(pageView, handlePageChanged, LV_EVENT_VALUE_CHANGED, nullptr);
-  updatePetPageActiveState();
+  updateSpritePageActiveState();
 }
 
 void ui_set_network_info(const char *ssid, const char *url) {
@@ -292,8 +400,11 @@ bool ui_show_pet_sprite(const char *name, const char *lvglPath) {
 
   snprintf(petSpritePath, sizeof(petSpritePath), "%s", lvglPath);
   snprintf(petSpriteName, sizeof(petSpriteName), "%s", name == nullptr ? "sprite" : name);
-  if (!petPageActive) {
+  if (!spritePageActive) {
     lv_label_set_text_fmt(petStatusLabel, "%s ready", petSpriteName);
+    if (codexUsageStatusLabel != nullptr) {
+      lv_label_set_text_fmt(codexUsageStatusLabel, "%s ready", petSpriteName);
+    }
     return true;
   }
 
@@ -309,6 +420,13 @@ void ui_clear_pet_sprite(const char *message) {
     lv_label_set_text(petStatusLabel, message == nullptr ? "No pet sprite loaded" : message);
     lv_obj_remove_flag(petStatusLabel, LV_OBJ_FLAG_HIDDEN);
   }
+
+  if (codexUsageStatusLabel != nullptr) {
+    lv_label_set_text(
+        codexUsageStatusLabel,
+        message == nullptr ? "No pet sprite loaded" : message);
+    lv_obj_remove_flag(codexUsageStatusLabel, LV_OBJ_FLAG_HIDDEN);
+  }
 }
 
 bool ui_show_pet_message(const char *message) {
@@ -320,7 +438,23 @@ void ui_clear_pet_message() {
 }
 
 bool ui_is_pet_page_active() {
-  return petPageActive;
+  return spritePageActive;
+}
+
+uint8_t ui_get_codex_usage_percent() {
+  return codexUsagePercent;
+}
+
+void ui_set_codex_usage_percent(uint8_t percent) {
+  codexUsagePercent = percent > 100 ? 100 : percent;
+
+  if (codexUsageBar != nullptr) {
+    lv_bar_set_value(codexUsageBar, codexUsagePercent, LV_ANIM_ON);
+  }
+
+  if (codexUsageLabel != nullptr) {
+    lv_label_set_text_fmt(codexUsageLabel, "%u%%", codexUsagePercent);
+  }
 }
 
 size_t ui_get_page_count() {
@@ -358,6 +492,6 @@ bool ui_set_active_page_index(size_t index, bool animate) {
       static_cast<uint32_t>(index),
       0,
       animate ? LV_ANIM_ON : LV_ANIM_OFF);
-  updatePetPageActiveState();
+  updateSpritePageActiveState();
   return true;
 }

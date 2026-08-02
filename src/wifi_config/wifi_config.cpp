@@ -139,6 +139,67 @@ bool parse_brightness_request(uint8_t &brightness, String &error) {
   return false;
 }
 
+bool parse_percent_arg(const String &value, uint8_t &result) {
+  if (value.length() == 0) {
+    return false;
+  }
+
+  for (size_t i = 0; i < value.length(); ++i) {
+    if (!isDigit(value[i])) {
+      return false;
+    }
+  }
+
+  const int parsed = value.toInt();
+  if (parsed < 0 || parsed > 100) {
+    return false;
+  }
+
+  result = static_cast<uint8_t>(parsed);
+  return true;
+}
+
+bool parse_codex_usage_request(uint8_t &percent, String &error) {
+  if (server.hasArg("plain") && server.arg("plain").length() > 0) {
+    JsonDocument doc;
+    DeserializationError jsonError = deserializeJson(doc, server.arg("plain"));
+    if (jsonError) {
+      error = "Invalid JSON";
+      return false;
+    }
+
+    JsonVariant value = doc["percent"];
+    if (value.isNull()) {
+      value = doc["value"];
+    }
+
+    if (!value.is<int>()) {
+      error = "Missing usage percent";
+      return false;
+    }
+
+    const int parsed = value.as<int>();
+    if (parsed < 0 || parsed > 100) {
+      error = "Usage percent must be between 0 and 100";
+      return false;
+    }
+
+    percent = static_cast<uint8_t>(parsed);
+    return true;
+  }
+
+  if (server.hasArg("percent") && parse_percent_arg(server.arg("percent"), percent)) {
+    return true;
+  }
+
+  if (server.hasArg("value") && parse_percent_arg(server.arg("value"), percent)) {
+    return true;
+  }
+
+  error = "Usage percent must be between 0 and 100";
+  return false;
+}
+
 bool parse_non_negative_int_arg(const String &value, int &result) {
   if (value.length() == 0) {
     return false;
@@ -539,6 +600,29 @@ void handleBrightnessPost() {
 
   display_control_set_brightness(brightness, true);
   server.send(200, "text/plain", "Brightness set to " + String(brightness));
+}
+
+void handleCodexUsageGet() {
+  JsonDocument doc;
+  doc["percent"] = ui_get_codex_usage_percent();
+  doc["min"] = 0;
+  doc["max"] = 100;
+
+  String response;
+  serializeJson(doc, response);
+  server.send(200, "application/json", response);
+}
+
+void handleCodexUsagePost() {
+  uint8_t percent = 0;
+  String error;
+  if (!parse_codex_usage_request(percent, error)) {
+    server.send(400, "text/plain", error);
+    return;
+  }
+
+  ui_set_codex_usage_percent(percent);
+  server.send(200, "text/plain", "Codex usage set to " + String(percent) + "%");
 }
 
 void handlePagesGet() {
@@ -954,6 +1038,8 @@ void wifi_config_init() {
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/brightness", HTTP_GET, handleBrightnessGet);
   server.on("/brightness", HTTP_POST, handleBrightnessPost);
+  server.on("/codex/usage", HTTP_GET, handleCodexUsageGet);
+  server.on("/codex/usage", HTTP_POST, handleCodexUsagePost);
   server.on("/pages", HTTP_GET, handlePagesGet);
   server.on("/page", HTTP_POST, handlePagePost);
   server.on("/beep", HTTP_POST, handleBeep);

@@ -147,6 +147,7 @@ curl -X POST "$ESP32_AGENT_URL/pet" -H 'Content-Type: application/json' -d '{"na
 curl -X POST "$ESP32_AGENT_URL/pet" -H 'Content-Type: application/json' -d '{"name":"codex-failed","ttlMs":5000}'
 curl -X POST "$ESP32_AGENT_URL/pet" -H 'Content-Type: application/json' -d '{"name":"codex-idle","ttlMs":0}'
 curl -X POST "$ESP32_AGENT_URL/pet/message" -H 'Content-Type: application/json' -d '{"message":"Codex needs approval","ttlMs":5000}'
+curl -X POST "$ESP32_AGENT_URL/codex/usage" -H 'Content-Type: application/json' -d '{"percent":42}'
 ```
 
 ## Claude Code event hooks
