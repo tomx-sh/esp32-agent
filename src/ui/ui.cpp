@@ -5,7 +5,7 @@
 #include <lvgl.h>
 
 #include "debug/debug_log.h"
-#include "fonts/jetbrains_mono_24.h"
+#include "fonts/jetbrains_mono_36.h"
 #include "icons/flask_round_24.h"
 #include "page_view.h"
 #include "pet_message.h"
@@ -372,13 +372,13 @@ void buildCodexUsagePage(lv_obj_t *parent) {
 
   codexUsageStatusLabel = lv_label_create(codexUsageGifContent);
   lv_label_set_text(codexUsageStatusLabel, "No pet sprite loaded");
-  configureLabel(codexUsageStatusLabel, &lv_font_montserrat_20, LV_TEXT_ALIGN_CENTER);
+  configureLabel(codexUsageStatusLabel, &lv_font_montserrat_32, LV_TEXT_ALIGN_CENTER);
   lv_obj_align(codexUsageStatusLabel, LV_ALIGN_CENTER, 0, 0);
 
   codexResetLabel = lv_label_create(codexUsageGifContent);
   lv_obj_set_width(codexResetLabel, lv_pct(100));
   lv_obj_set_style_text_color(codexResetLabel, lv_color_white(), 0);
-  lv_obj_set_style_text_font(codexResetLabel, &jetbrains_mono_24, 0);
+  lv_obj_set_style_text_font(codexResetLabel, &jetbrains_mono_36, 0);
   lv_obj_set_style_text_align(codexResetLabel, LV_TEXT_ALIGN_LEFT, 0);
   lv_label_set_recolor(codexResetLabel, true);
   lv_label_set_long_mode(codexResetLabel, LV_LABEL_LONG_CLIP);
@@ -388,7 +388,7 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   codexResetCreditsRow = lv_obj_create(codexUsageGifContent);
   lv_obj_remove_style_all(codexResetCreditsRow);
   lv_obj_remove_flag(codexResetCreditsRow, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_size(codexResetCreditsRow, LV_SIZE_CONTENT, 24);
+  lv_obj_set_size(codexResetCreditsRow, LV_SIZE_CONTENT, 44);
   lv_obj_set_style_pad_column(codexResetCreditsRow, 8, 0);
   lv_obj_set_flex_flow(codexResetCreditsRow, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(
@@ -396,11 +396,14 @@ void buildCodexUsagePage(lv_obj_t *parent) {
       LV_FLEX_ALIGN_START,
       LV_FLEX_ALIGN_CENTER,
       LV_FLEX_ALIGN_CENTER);
-  lv_obj_align(codexResetCreditsRow, LV_ALIGN_TOP_LEFT, 0, 30);
+  lv_obj_align(codexResetCreditsRow, LV_ALIGN_TOP_RIGHT, 0, 0);
 
   lv_obj_t *resetCreditsIcon = lv_image_create(codexResetCreditsRow);
   lv_image_set_src(resetCreditsIcon, &flask_round_24);
-  lv_obj_set_style_image_recolor(resetCreditsIcon, lv_color_white(), 0);
+  lv_obj_set_style_image_recolor(
+      resetCreditsIcon,
+      lv_color_hex(kCodexGaugeEmptyColor),
+      0);
   lv_obj_set_style_image_recolor_opa(resetCreditsIcon, LV_OPA_COVER, 0);
 
   codexResetCreditsLabel = lv_label_create(codexResetCreditsRow);
@@ -408,14 +411,14 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_text_get_size(
       &maximumResetCreditsSize,
       "999",
-      &jetbrains_mono_24,
+      &jetbrains_mono_36,
       0,
       0,
       LV_COORD_MAX,
       LV_TEXT_FLAG_NONE);
   lv_obj_set_width(codexResetCreditsLabel, maximumResetCreditsSize.x + 4);
   lv_obj_set_style_text_color(codexResetCreditsLabel, lv_color_white(), 0);
-  lv_obj_set_style_text_font(codexResetCreditsLabel, &jetbrains_mono_24, 0);
+  lv_obj_set_style_text_font(codexResetCreditsLabel, &jetbrains_mono_36, 0);
   lv_obj_set_style_text_align(codexResetCreditsLabel, LV_TEXT_ALIGN_LEFT, 0);
   lv_label_set_long_mode(codexResetCreditsLabel, LV_LABEL_LONG_CLIP);
   updateCodexResetCreditsLabel();
@@ -428,7 +431,7 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_obj_t *gaugeRow = lv_obj_create(content);
   lv_obj_remove_style_all(gaugeRow);
   lv_obj_remove_flag(gaugeRow, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_size(gaugeRow, lv_pct(100), 40);
+  lv_obj_set_size(gaugeRow, lv_pct(100), 52);
   lv_obj_set_style_pad_column(gaugeRow, 12, 0);
   lv_obj_set_flex_flow(gaugeRow, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(
@@ -454,14 +457,14 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_text_get_size(
       &maximumPercentSize,
       "100%",
-      &jetbrains_mono_24,
+      &jetbrains_mono_36,
       0,
       0,
       LV_COORD_MAX,
       LV_TEXT_FLAG_NONE);
   lv_obj_set_width(codexUsageLabel, maximumPercentSize.x + 4);
   lv_obj_set_style_text_color(codexUsageLabel, lv_color_white(), 0);
-  lv_obj_set_style_text_font(codexUsageLabel, &jetbrains_mono_24, 0);
+  lv_obj_set_style_text_font(codexUsageLabel, &jetbrains_mono_36, 0);
   lv_obj_set_style_text_align(codexUsageLabel, LV_TEXT_ALIGN_RIGHT, 0);
   lv_label_set_long_mode(codexUsageLabel, LV_LABEL_LONG_CLIP);
   lv_label_set_text_fmt(codexUsageLabel, "%u%%", codexUsagePercent);
