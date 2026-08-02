@@ -28,6 +28,7 @@ constexpr uint16_t kMaxSpriteWidth = 240;
 constexpr uint16_t kMaxSpriteHeight = 240;
 constexpr size_t kMaxPetMessageLength = 240;
 constexpr uint32_t kMaxCodexResetMinutes = 365 * 24 * 60;
+constexpr uint16_t kMaxCodexResetCredits = 999;
 constexpr char kSpriteDir[] = "/sprites";
 constexpr char kSpriteUploadPath[] = "/sprites/.upload.gif";
 constexpr char kDefaultSpriteName[] = "idle";
@@ -180,7 +181,31 @@ bool parse_reset_minutes_arg(const String &value, uint32_t &result) {
   return true;
 }
 
-bool parse_codex_usage_request(uint8_t &percent, uint32_t &resetMinutes, String &error) {
+bool parse_reset_credits_arg(const String &value, uint16_t &result) {
+  if (value.length() == 0) {
+    return false;
+  }
+
+  for (size_t i = 0; i < value.length(); ++i) {
+    if (!isDigit(value[i])) {
+      return false;
+    }
+  }
+
+  const int parsed = value.toInt();
+  if (parsed < 0 || parsed > kMaxCodexResetCredits) {
+    return false;
+  }
+
+  result = static_cast<uint16_t>(parsed);
+  return true;
+}
+
+bool parse_codex_usage_request(
+    uint8_t &percent,
+    uint32_t &resetMinutes,
+    uint16_t &resetCredits,
+    String &error) {
   if (server.hasArg("plain") && server.arg("plain").length() > 0) {
     JsonDocument doc;
     DeserializationError jsonError = deserializeJson(doc, server.arg("plain"));
@@ -222,6 +247,22 @@ bool parse_codex_usage_request(uint8_t &percent, uint32_t &resetMinutes, String 
 
       resetMinutes = static_cast<uint32_t>(parsedResetMinutes);
     }
+
+    JsonVariant resetCreditsValue = doc["resetCredits"];
+    if (!resetCreditsValue.isNull()) {
+      if (!resetCreditsValue.is<int>()) {
+        error = "Reset credits must be a number";
+        return false;
+      }
+
+      const int parsedResetCredits = resetCreditsValue.as<int>();
+      if (parsedResetCredits < 0 || parsedResetCredits > kMaxCodexResetCredits) {
+        error = "Reset credits must be between 0 and 999";
+        return false;
+      }
+
+      resetCredits = static_cast<uint16_t>(parsedResetCredits);
+    }
     return true;
   }
 
@@ -232,6 +273,12 @@ bool parse_codex_usage_request(uint8_t &percent, uint32_t &resetMinutes, String 
       error = "Reset minutes must be between 0 and 525600";
       return false;
     }
+    if (
+        server.hasArg("resetCredits") &&
+        !parse_reset_credits_arg(server.arg("resetCredits"), resetCredits)) {
+      error = "Reset credits must be between 0 and 999";
+      return false;
+    }
     return true;
   }
 
@@ -240,6 +287,12 @@ bool parse_codex_usage_request(uint8_t &percent, uint32_t &resetMinutes, String 
         server.hasArg("resetMinutes") &&
         !parse_reset_minutes_arg(server.arg("resetMinutes"), resetMinutes)) {
       error = "Reset minutes must be between 0 and 525600";
+      return false;
+    }
+    if (
+        server.hasArg("resetCredits") &&
+        !parse_reset_credits_arg(server.arg("resetCredits"), resetCredits)) {
+      error = "Reset credits must be between 0 and 999";
       return false;
     }
     return true;
@@ -655,9 +708,11 @@ void handleCodexUsageGet() {
   JsonDocument doc;
   doc["percent"] = ui_get_codex_usage_percent();
   doc["resetMinutes"] = ui_get_codex_reset_minutes();
+  doc["resetCredits"] = ui_get_codex_reset_credits();
   doc["min"] = 0;
   doc["max"] = 100;
   doc["resetMinutesMax"] = kMaxCodexResetMinutes;
+  doc["resetCreditsMax"] = kMaxCodexResetCredits;
 
   String response;
   serializeJson(doc, response);
@@ -667,18 +722,21 @@ void handleCodexUsageGet() {
 void handleCodexUsagePost() {
   uint8_t percent = 0;
   uint32_t resetMinutes = ui_get_codex_reset_minutes();
+  uint16_t resetCredits = ui_get_codex_reset_credits();
   String error;
-  if (!parse_codex_usage_request(percent, resetMinutes, error)) {
+  if (!parse_codex_usage_request(percent, resetMinutes, resetCredits, error)) {
     server.send(400, "text/plain", error);
     return;
   }
 
   ui_set_codex_usage_percent(percent);
   ui_set_codex_reset_minutes(resetMinutes);
+  ui_set_codex_reset_credits(resetCredits);
   server.send(
       200,
       "text/plain",
-      "Codex usage set to " + String(percent) + "% (resets in " + String(resetMinutes) + "m)");
+      "Codex usage set to " + String(percent) + "% (resets in " + String(resetMinutes) +
+          "m, " + String(resetCredits) + " reset credits)");
 }
 
 void handlePagesGet() {

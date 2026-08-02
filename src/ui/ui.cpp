@@ -6,6 +6,7 @@
 
 #include "debug/debug_log.h"
 #include "fonts/jetbrains_mono_24.h"
+#include "icons/flask_round_24.h"
 #include "page_view.h"
 #include "pet_message.h"
 
@@ -22,10 +23,13 @@ lv_obj_t *codexUsageStatusLabel = nullptr;
 lv_obj_t *codexUsageBar = nullptr;
 lv_obj_t *codexUsageLabel = nullptr;
 lv_obj_t *codexResetLabel = nullptr;
+lv_obj_t *codexResetCreditsRow = nullptr;
+lv_obj_t *codexResetCreditsLabel = nullptr;
 lv_timer_t *codexResetTimer = nullptr;
 bool spritePageActive = false;
 uint8_t codexUsagePercent = 0;
 uint32_t codexResetMinutes = 0;
+uint16_t codexResetCredits = 0;
 char petSpritePath[96] = "";
 char petSpriteName[40] = "";
 
@@ -71,6 +75,20 @@ void updateCodexResetLabel() {
 
   lv_obj_remove_flag(codexResetLabel, LV_OBJ_FLAG_HIDDEN);
   lv_obj_move_foreground(codexResetLabel);
+}
+
+void updateCodexResetCreditsLabel() {
+  if (codexResetCreditsLabel == nullptr) {
+    return;
+  }
+
+  lv_label_set_text_fmt(
+      codexResetCreditsLabel,
+      "%u",
+      static_cast<unsigned int>(codexResetCredits));
+  if (codexResetCreditsRow != nullptr) {
+    lv_obj_move_foreground(codexResetCreditsRow);
+  }
 }
 
 void handleCodexResetTimer(lv_timer_t *timer) {
@@ -231,6 +249,7 @@ bool loadPendingPetSprite() {
   lv_obj_add_flag(statusLabel, LV_OBJ_FLAG_HIDDEN);
   if (activePageIndex() == static_cast<int32_t>(kCodexUsagePageIndex)) {
     updateCodexResetLabel();
+    updateCodexResetCreditsLabel();
   }
   if (activePageIndex() == static_cast<int32_t>(kPetPageIndex)) {
     pet_message_init(petContent);
@@ -365,6 +384,41 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_label_set_long_mode(codexResetLabel, LV_LABEL_LONG_CLIP);
   lv_obj_align(codexResetLabel, LV_ALIGN_TOP_LEFT, 0, 0);
   updateCodexResetLabel();
+
+  codexResetCreditsRow = lv_obj_create(codexUsageGifContent);
+  lv_obj_remove_style_all(codexResetCreditsRow);
+  lv_obj_remove_flag(codexResetCreditsRow, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_size(codexResetCreditsRow, LV_SIZE_CONTENT, 24);
+  lv_obj_set_style_pad_column(codexResetCreditsRow, 8, 0);
+  lv_obj_set_flex_flow(codexResetCreditsRow, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(
+      codexResetCreditsRow,
+      LV_FLEX_ALIGN_START,
+      LV_FLEX_ALIGN_CENTER,
+      LV_FLEX_ALIGN_CENTER);
+  lv_obj_align(codexResetCreditsRow, LV_ALIGN_TOP_LEFT, 0, 30);
+
+  lv_obj_t *resetCreditsIcon = lv_image_create(codexResetCreditsRow);
+  lv_image_set_src(resetCreditsIcon, &flask_round_24);
+  lv_obj_set_style_image_recolor(resetCreditsIcon, lv_color_white(), 0);
+  lv_obj_set_style_image_recolor_opa(resetCreditsIcon, LV_OPA_COVER, 0);
+
+  codexResetCreditsLabel = lv_label_create(codexResetCreditsRow);
+  lv_point_t maximumResetCreditsSize = {};
+  lv_text_get_size(
+      &maximumResetCreditsSize,
+      "999",
+      &jetbrains_mono_24,
+      0,
+      0,
+      LV_COORD_MAX,
+      LV_TEXT_FLAG_NONE);
+  lv_obj_set_width(codexResetCreditsLabel, maximumResetCreditsSize.x + 4);
+  lv_obj_set_style_text_color(codexResetCreditsLabel, lv_color_white(), 0);
+  lv_obj_set_style_text_font(codexResetCreditsLabel, &jetbrains_mono_24, 0);
+  lv_obj_set_style_text_align(codexResetCreditsLabel, LV_TEXT_ALIGN_LEFT, 0);
+  lv_label_set_long_mode(codexResetCreditsLabel, LV_LABEL_LONG_CLIP);
+  updateCodexResetCreditsLabel();
 
   codexResetTimer = lv_timer_create(handleCodexResetTimer, 60 * 1000, nullptr);
   if (codexResetTimer != nullptr && codexResetMinutes == 0) {
@@ -549,6 +603,15 @@ void ui_set_codex_reset_minutes(uint32_t minutes) {
   } else {
     lv_timer_pause(codexResetTimer);
   }
+}
+
+uint16_t ui_get_codex_reset_credits() {
+  return codexResetCredits;
+}
+
+void ui_set_codex_reset_credits(uint16_t credits) {
+  codexResetCredits = credits;
+  updateCodexResetCreditsLabel();
 }
 
 size_t ui_get_page_count() {
