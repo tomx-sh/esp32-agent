@@ -37,8 +37,20 @@ char petSpriteName[40] = "";
 constexpr size_t kCodexUsagePageIndex = 0;
 constexpr size_t kPetPageIndex = 1;
 constexpr uint32_t kCodexGaugeEmptyColor = 0x303030;
+constexpr int32_t kCodexResetCreditsRowHeight = 36;
 constexpr time_t kValidClockEpoch = 1700000000;
 constexpr uint64_t kAbsoluteResetDateThresholdSeconds = 24 * 60 * 60;
+
+int32_t getDigitVisualTopOffset(const lv_font_t *font, int32_t targetHeight) {
+  lv_font_glyph_dsc_t digit = {};
+  if (!lv_font_get_glyph_dsc(font, &digit, '0', 0)) {
+    return (targetHeight - lv_font_get_line_height(font)) / 2;
+  }
+
+  const int32_t glyphTop =
+      lv_font_get_line_height(font) - font->base_line - digit.box_h - digit.ofs_y;
+  return (targetHeight - digit.box_h) / 2 - glyphTop;
+}
 
 void hideCodexResetLabel() {
   lv_obj_add_flag(codexResetLabel, LV_OBJ_FLAG_HIDDEN);
@@ -407,19 +419,25 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_obj_set_style_text_align(codexResetLabel, LV_TEXT_ALIGN_LEFT, 0);
   lv_label_set_recolor(codexResetLabel, true);
   lv_label_set_long_mode(codexResetLabel, LV_LABEL_LONG_CLIP);
-  lv_obj_align(codexResetLabel, LV_ALIGN_TOP_LEFT, 0, 0);
+  const int32_t resetTextTopOffset = getDigitVisualTopOffset(
+      &jetbrains_mono_36,
+      kCodexResetCreditsRowHeight);
+  lv_obj_align(codexResetLabel, LV_ALIGN_TOP_LEFT, 0, resetTextTopOffset);
   updateCodexResetLabel();
 
   codexResetCreditsRow = lv_obj_create(codexUsageGifContent);
   lv_obj_remove_style_all(codexResetCreditsRow);
   lv_obj_remove_flag(codexResetCreditsRow, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_size(codexResetCreditsRow, LV_SIZE_CONTENT, 36);
+  lv_obj_set_size(
+      codexResetCreditsRow,
+      LV_SIZE_CONTENT,
+      kCodexResetCreditsRowHeight);
   lv_obj_set_style_pad_column(codexResetCreditsRow, 8, 0);
   lv_obj_set_flex_flow(codexResetCreditsRow, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(
       codexResetCreditsRow,
       LV_FLEX_ALIGN_START,
-      LV_FLEX_ALIGN_START,
+      LV_FLEX_ALIGN_CENTER,
       LV_FLEX_ALIGN_CENTER);
   lv_obj_align(codexResetCreditsRow, LV_ALIGN_TOP_RIGHT, 0, 0);
 
@@ -432,20 +450,19 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_obj_set_style_image_recolor_opa(resetCreditsIcon, LV_OPA_COVER, 0);
 
   codexResetCreditsLabel = lv_label_create(codexResetCreditsRow);
-  lv_point_t maximumResetCreditsSize = {};
-  lv_text_get_size(
-      &maximumResetCreditsSize,
-      "999",
-      &jetbrains_mono_36,
-      0,
-      0,
-      LV_COORD_MAX,
-      LV_TEXT_FLAG_NONE);
-  lv_obj_set_width(codexResetCreditsLabel, maximumResetCreditsSize.x + 4);
+  lv_obj_set_width(codexResetCreditsLabel, LV_SIZE_CONTENT);
   lv_obj_set_style_text_color(codexResetCreditsLabel, lv_color_white(), 0);
   lv_obj_set_style_text_font(codexResetCreditsLabel, &jetbrains_mono_36, 0);
   lv_obj_set_style_text_align(codexResetCreditsLabel, LV_TEXT_ALIGN_LEFT, 0);
   lv_label_set_long_mode(codexResetCreditsLabel, LV_LABEL_LONG_CLIP);
+  const int32_t resetCreditsLineBoxTopOffset =
+      (kCodexResetCreditsRowHeight -
+       lv_font_get_line_height(&jetbrains_mono_36)) /
+      2;
+  lv_obj_set_style_translate_y(
+      codexResetCreditsLabel,
+      resetTextTopOffset - resetCreditsLineBoxTopOffset,
+      0);
   updateCodexResetCreditsLabel();
 
   codexResetTimer = lv_timer_create(handleCodexResetTimer, 60 * 1000, nullptr);
