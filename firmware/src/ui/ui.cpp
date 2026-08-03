@@ -44,7 +44,7 @@ char petSpriteName[40] = "";
 
 constexpr size_t kCodexUsagePageIndex = 0;
 constexpr size_t kPetPageIndex = 1;
-constexpr uint32_t kCodexGaugeEmptyColor = 0x303030;
+constexpr uint32_t kCodexMutedColor = 0x707070;
 constexpr int32_t kCodexMessageShadowRadius = 3;
 constexpr int32_t kCodexMessageShadowOffsetX = 1;
 constexpr int32_t kCodexMessageShadowOffsetY = 2;
@@ -141,7 +141,7 @@ void updateCodexMessageAppearance() {
 
   lv_obj_set_style_text_color(
       codexMessageLabel,
-      codexMessageMuted ? lv_color_hex(kCodexGaugeEmptyColor) : lv_color_white(),
+      codexMessageMuted ? lv_color_hex(kCodexMutedColor) : lv_color_white(),
       0);
   lv_obj_set_style_drop_shadow_opa(
       codexMessageLabel,
@@ -193,7 +193,7 @@ void updateCodexResetLabel() {
     lv_label_set_text_fmt(
         codexResetLabel,
         "#%06lx resets# %s %d",
-        static_cast<unsigned long>(kCodexGaugeEmptyColor),
+        static_cast<unsigned long>(kCodexMutedColor),
         kMonthNames[utcReset.tm_mon],
         utcReset.tm_mday);
   } else {
@@ -205,14 +205,14 @@ void updateCodexResetLabel() {
       lv_label_set_text_fmt(
           codexResetLabel,
           "#%06lx resets# %luh %lum",
-          static_cast<unsigned long>(kCodexGaugeEmptyColor),
+          static_cast<unsigned long>(kCodexMutedColor),
           static_cast<unsigned long>(hours),
           static_cast<unsigned long>(minutes));
     } else {
       lv_label_set_text_fmt(
           codexResetLabel,
           "#%06lx resets# %lum",
-          static_cast<unsigned long>(kCodexGaugeEmptyColor),
+          static_cast<unsigned long>(kCodexMutedColor),
           static_cast<unsigned long>(minutes));
     }
   }
@@ -565,7 +565,7 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_image_set_src(resetCreditsIcon, &flask_round_36);
   lv_obj_set_style_image_recolor(
       resetCreditsIcon,
-      lv_color_hex(kCodexGaugeEmptyColor),
+      lv_color_hex(kCodexMutedColor),
       0);
   lv_obj_set_style_image_recolor_opa(resetCreditsIcon, LV_OPA_COVER, 0);
 
@@ -614,7 +614,7 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_obj_remove_style(codexContextArc, nullptr, LV_PART_KNOB);
   lv_obj_set_style_arc_color(
       codexContextArc,
-      lv_color_hex(kCodexGaugeEmptyColor),
+      lv_color_hex(kCodexMutedColor),
       LV_PART_MAIN);
   lv_obj_set_style_arc_opa(codexContextArc, LV_OPA_COVER, LV_PART_MAIN);
   lv_obj_set_style_arc_width(
@@ -669,7 +669,7 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_obj_set_flex_grow(codexUsageBar, 1);
   lv_obj_set_style_radius(codexUsageBar, LV_RADIUS_CIRCLE, LV_PART_MAIN);
   lv_obj_set_style_radius(codexUsageBar, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
-  lv_obj_set_style_bg_color(codexUsageBar, lv_color_hex(kCodexGaugeEmptyColor), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(codexUsageBar, lv_color_hex(kCodexMutedColor), LV_PART_MAIN);
   lv_obj_set_style_bg_opa(codexUsageBar, LV_OPA_COVER, LV_PART_MAIN);
   lv_obj_set_style_bg_color(codexUsageBar, lv_color_white(), LV_PART_INDICATOR);
   lv_obj_set_style_bg_opa(codexUsageBar, LV_OPA_COVER, LV_PART_INDICATOR);
@@ -701,7 +701,7 @@ void buildCodexUsagePage(lv_obj_t *parent) {
       lv_font_get_line_height(&codexMessageFont));
   lv_obj_set_style_text_color(
       codexMessageLabel,
-      codexMessageMuted ? lv_color_hex(kCodexGaugeEmptyColor) : lv_color_white(),
+      codexMessageMuted ? lv_color_hex(kCodexMutedColor) : lv_color_white(),
       0);
   lv_obj_set_style_text_font(codexMessageLabel, &codexMessageFont, 0);
   lv_obj_set_style_text_align(codexMessageLabel, LV_TEXT_ALIGN_LEFT, 0);
