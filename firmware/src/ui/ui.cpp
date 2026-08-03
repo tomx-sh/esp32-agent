@@ -464,19 +464,6 @@ lv_obj_t *createPageContent(lv_obj_t *parent) {
   return content;
 }
 
-void buildHelloPage(lv_obj_t *parent) {
-  lv_obj_t *content = createPageContent(parent);
-  lv_obj_set_flex_align(
-      content,
-      LV_FLEX_ALIGN_CENTER,
-      LV_FLEX_ALIGN_CENTER,
-      LV_FLEX_ALIGN_CENTER);
-
-  lv_obj_t *label = lv_label_create(content);
-  lv_label_set_text(label, "Hello World");
-  configureLabel(label, &lv_font_montserrat_32, LV_TEXT_ALIGN_CENTER);
-}
-
 void buildWifiConfigPage(lv_obj_t *parent) {
   lv_obj_t *content = createPageContent(parent);
 
@@ -720,7 +707,6 @@ constexpr UiPageDefinition kPages[] = {
     {"Codex Usage", buildCodexUsagePage},
     {"Pet", buildPetPage},
     {"Wi-Fi", buildWifiConfigPage},
-    {"Hello", buildHelloPage},
 };
 }
 
