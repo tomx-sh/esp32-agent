@@ -17,6 +17,12 @@ The first OTA-capable firmware must be flashed over USB.
 
 ## Workflow
 
+Enter the PlatformIO project directory:
+
+```sh
+cd firmware
+```
+
 Build the OTA environment first:
 
 ```sh

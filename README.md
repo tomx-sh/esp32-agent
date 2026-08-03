@@ -1,10 +1,21 @@
 # ESP32 Agent
 
-Voice-enabled AI agent device for the ESP32-S3. Features an LVGL display UI, BLE connectivity, ES8311 audio with an agent backend, and a web-based WiFi configuration interface. Built with PlatformIO and Arduino framework.
+Monorepo for an ESP32-S3 AI agent device and its host companion. The firmware provides an LVGL display UI, BLE connectivity, ES8311 audio, and web-based Wi-Fi configuration. The companion connects desktop AI agents to the device.
+
+```text
+firmware/   PlatformIO and Arduino firmware
+companion/  Host companion and integration hooks
+```
 
 ## OTA flashing
 
-The first flash still has to be done over USB:
+Run firmware commands from the PlatformIO project directory:
+
+```sh
+cd firmware
+```
+
+The first flash has to be done over USB:
 
 ```sh
 pio run -t upload
@@ -16,7 +27,7 @@ After the device is running this firmware and connected to Wi-Fi, upload OTA wit
 pio run -e esp32-s3-devkitc-1-ota -t upload
 ```
 
-The OTA target uses `esp32-agent.local:3232`. If mDNS does not resolve on your network, replace `upload_port` in `platformio.ini` with the IP shown on the device display.
+The OTA target uses `esp32-agent.local:3232`. If mDNS does not resolve on your network, replace `upload_port` in `firmware/platformio.ini` with the IP shown on the device display.
 
 ## Codex event hooks
 
@@ -37,7 +48,7 @@ Example `.codex/hooks.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" codex-waving 4000",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/companion/scripts/esp32-agent-hook.sh\" codex-waving 4000",
             "statusMessage": "Showing ESP32 agent session start"
           }
         ]
@@ -48,7 +59,7 @@ Example `.codex/hooks.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" codex-thinking 0",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/companion/scripts/esp32-agent-hook.sh\" codex-thinking 0",
             "statusMessage": "Showing ESP32 agent thinking"
           }
         ]
@@ -60,7 +71,7 @@ Example `.codex/hooks.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" codex-waiting 0",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/companion/scripts/esp32-agent-hook.sh\" codex-waiting 0",
             "statusMessage": "Showing ESP32 agent waiting"
           }
         ]
@@ -72,7 +83,7 @@ Example `.codex/hooks.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" codex-review 3000",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/companion/scripts/esp32-agent-hook.sh\" codex-review 3000",
             "statusMessage": "Showing ESP32 agent tool review"
           }
         ]
@@ -83,7 +94,7 @@ Example `.codex/hooks.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" codex-idle 0",
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/companion/scripts/esp32-agent-hook.sh\" codex-idle 0",
             "statusMessage": "Showing ESP32 agent idle"
           }
         ]
@@ -93,7 +104,7 @@ Example `.codex/hooks.json`:
 }
 ```
 
-Example `scripts/esp32-agent-hook.sh`:
+Example `companion/scripts/esp32-agent-hook.sh`:
 
 ```sh
 #!/bin/sh
@@ -156,9 +167,10 @@ curl -X POST "$ESP32_AGENT_URL/codex/context" -H 'Content-Type: application/json
 
 `POST /codex/message` sets the one-line message overlaid at the top of the Codex Usage page. Normal messages appear above the GIF with a drop shadow. Set `muted` to `true` to use the same muted gray as the usage gauge, disable the shadow, and place the text behind the GIF; when omitted, the current muted state is preserved. Messages may contain up to 240 bytes; line breaks are rejected, text wider than the display is truncated with a single ellipsis glyph, and an empty string clears the message. `GET /codex/message` returns the current message, muted state, and maximum length. The values are held in memory and reset when the device restarts.
 
-The message label uses LVGL's built-in 36 px Montserrat font. The numeric and reset labels use a generated 36 px JetBrains Mono font containing only their curated glyph set; it also supplies the single ellipsis glyph that Montserrat lacks as a fallback for truncated messages. The generated bitmap remains uncompressed for fast rendering and is rebuilt with `scripts/generate_fonts.sh`. Regenerate it after replacing the source TTF:
+The message label uses LVGL's built-in 36 px Montserrat font. The numeric and reset labels use a generated 36 px JetBrains Mono font containing only their curated glyph set; it also supplies the single ellipsis glyph that Montserrat lacks as a fallback for truncated messages. The generated bitmap remains uncompressed for fast rendering and is rebuilt with `firmware/scripts/generate_fonts.sh`. Regenerate it after replacing the source TTF:
 
 ```sh
+cd firmware
 ./scripts/generate_fonts.sh
 ```
 
@@ -189,7 +201,7 @@ Example `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" claude-code-session-start 4000"
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/companion/scripts/esp32-agent-hook.sh\" claude-code-session-start 4000"
           }
         ]
       }
@@ -199,7 +211,7 @@ Example `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" claude-code-user-prompt-submit 0"
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/companion/scripts/esp32-agent-hook.sh\" claude-code-user-prompt-submit 0"
           }
         ]
       }
@@ -210,7 +222,7 @@ Example `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" claude-code-pre-tool-use 0"
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/companion/scripts/esp32-agent-hook.sh\" claude-code-pre-tool-use 0"
           }
         ]
       }
@@ -221,7 +233,7 @@ Example `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" claude-code-post-tool-use 3000"
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/companion/scripts/esp32-agent-hook.sh\" claude-code-post-tool-use 3000"
           }
         ]
       }
@@ -231,7 +243,7 @@ Example `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" claude-code-notification 0"
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/companion/scripts/esp32-agent-hook.sh\" claude-code-notification 0"
           }
         ]
       }
@@ -241,7 +253,7 @@ Example `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/scripts/esp32-agent-hook.sh\" claude-code-stop 0"
+            "command": "ESP32_AGENT_URL=http://esp32-agent.local sh \"$(git rev-parse --show-toplevel)/companion/scripts/esp32-agent-hook.sh\" claude-code-stop 0"
           }
         ]
       }
