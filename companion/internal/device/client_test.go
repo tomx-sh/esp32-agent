@@ -25,7 +25,7 @@ func TestClientWritesDevicePayloads(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	if err := client.SetUsage(ctx, Usage{Percent: 42, ResetAt: 1234, ResetCredits: 2}); err != nil {
+	if err := client.SetQuota(ctx, Quota{RemainingPercent: 58, ResetAt: 1234, ResetCredits: 2}); err != nil {
 		t.Fatal(err)
 	}
 	if err := client.SetContext(ctx, 68); err != nil {
@@ -37,7 +37,7 @@ func TestClientWritesDevicePayloads(t *testing.T) {
 	if err := client.SetPet(ctx, "codex-thinking", 1500*time.Millisecond); err != nil {
 		t.Fatal(err)
 	}
-	if received["/codex/usage"]["percent"] != float64(42) || received["/codex/usage"]["resetCredits"] != float64(2) {
+	if received["/codex/usage"]["remainingPercent"] != float64(58) || received["/codex/usage"]["resetCredits"] != float64(2) {
 		t.Fatalf("unexpected usage payload: %#v", received["/codex/usage"])
 	}
 	if received["/codex/context"]["remainingPercent"] != float64(68) {
@@ -53,7 +53,7 @@ func TestSnapshot(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/codex/usage":
-			_, _ = w.Write([]byte(`{"percent":17,"resetAt":1234,"resetCredits":3}`))
+			_, _ = w.Write([]byte(`{"remainingPercent":83,"resetAt":1234,"resetCredits":3}`))
 		case "/codex/context":
 			_, _ = w.Write([]byte(`{"remainingPercent":61}`))
 		case "/codex/message":
@@ -68,7 +68,7 @@ func TestSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Usage.Percent != 17 || snapshot.Context.RemainingPercent != 61 || snapshot.Message.Message != "Ready" {
+	if snapshot.Quota.RemainingPercent != 83 || snapshot.Context.RemainingPercent != 61 || snapshot.Message.Message != "Ready" {
 		t.Fatalf("unexpected snapshot: %#v", snapshot)
 	}
 }

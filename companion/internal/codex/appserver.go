@@ -13,11 +13,11 @@ import (
 )
 
 type Limits struct {
-	UsedPercent   int
-	ResetAt       int64
-	ResetCredits  int
-	WindowMinutes int
-	PlanType      string
+	RemainingPercent int
+	ResetAt          int64
+	ResetCredits     int
+	WindowMinutes    int
+	PlanType         string
 }
 
 type rpcResponse struct {
@@ -130,12 +130,12 @@ func parseLimits(data []byte) (Limits, error) {
 		return Limits{}, fmt.Errorf("Codex did not return a primary rate-limit window")
 	}
 	window := result.RateLimits.Primary
-	used := int(math.Round(window.UsedPercent))
-	if used < 0 {
-		used = 0
+	remaining := int(math.Round(100 - window.UsedPercent))
+	if remaining < 0 {
+		remaining = 0
 	}
-	if used > 100 {
-		used = 100
+	if remaining > 100 {
+		remaining = 100
 	}
 	credits := 0
 	if result.ResetCredits != nil {
@@ -148,11 +148,11 @@ func parseLimits(data []byte) (Limits, error) {
 		credits = 999
 	}
 	return Limits{
-		UsedPercent:   used,
-		ResetAt:       window.ResetsAt,
-		ResetCredits:  credits,
-		WindowMinutes: window.WindowDurationMins,
-		PlanType:      result.RateLimits.PlanType,
+		RemainingPercent: remaining,
+		ResetAt:          window.ResetsAt,
+		ResetCredits:     credits,
+		WindowMinutes:    window.WindowDurationMins,
+		PlanType:         result.RateLimits.PlanType,
 	}, nil
 }
 

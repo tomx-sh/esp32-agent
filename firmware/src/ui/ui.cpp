@@ -33,7 +33,7 @@ lv_timer_t *codexResetTimer = nullptr;
 lv_font_t codexMessageFont = {};
 lv_font_t codexMessageFallbackFont = {};
 bool spritePageActive = false;
-uint8_t codexUsagePercent = 0;
+uint8_t codexQuotaRemainingPercent = 100;
 uint8_t codexContextRemainingPercent = 100;
 uint64_t codexResetAt = 0;
 uint16_t codexResetCredits = 0;
@@ -674,7 +674,7 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_obj_set_style_bg_color(codexUsageBar, lv_color_white(), LV_PART_INDICATOR);
   lv_obj_set_style_bg_opa(codexUsageBar, LV_OPA_COVER, LV_PART_INDICATOR);
   lv_bar_set_range(codexUsageBar, 0, 100);
-  lv_bar_set_value(codexUsageBar, codexUsagePercent, LV_ANIM_OFF);
+  lv_bar_set_value(codexUsageBar, codexQuotaRemainingPercent, LV_ANIM_OFF);
 
   codexUsageLabel = lv_label_create(gaugeRow);
   lv_point_t maximumPercentSize = {};
@@ -691,7 +691,7 @@ void buildCodexUsagePage(lv_obj_t *parent) {
   lv_obj_set_style_text_font(codexUsageLabel, &jetbrains_mono_36, 0);
   lv_obj_set_style_text_align(codexUsageLabel, LV_TEXT_ALIGN_RIGHT, 0);
   lv_label_set_long_mode(codexUsageLabel, LV_LABEL_LONG_CLIP);
-  lv_label_set_text_fmt(codexUsageLabel, "%u%%", codexUsagePercent);
+  lv_label_set_text_fmt(codexUsageLabel, "%u%%", codexQuotaRemainingPercent);
 
   codexMessageLabel = lv_label_create(content);
   lv_obj_add_flag(codexMessageLabel, LV_OBJ_FLAG_FLOATING);
@@ -824,19 +824,19 @@ bool ui_is_pet_page_active() {
   return spritePageActive;
 }
 
-uint8_t ui_get_codex_usage_percent() {
-  return codexUsagePercent;
+uint8_t ui_get_codex_quota_remaining_percent() {
+  return codexQuotaRemainingPercent;
 }
 
-void ui_set_codex_usage_percent(uint8_t percent) {
-  codexUsagePercent = percent > 100 ? 100 : percent;
+void ui_set_codex_quota_remaining_percent(uint8_t remainingPercent) {
+  codexQuotaRemainingPercent = remainingPercent > 100 ? 100 : remainingPercent;
 
   if (codexUsageBar != nullptr) {
-    lv_bar_set_value(codexUsageBar, codexUsagePercent, LV_ANIM_ON);
+    lv_bar_set_value(codexUsageBar, codexQuotaRemainingPercent, LV_ANIM_ON);
   }
 
   if (codexUsageLabel != nullptr) {
-    lv_label_set_text_fmt(codexUsageLabel, "%u%%", codexUsagePercent);
+    lv_label_set_text_fmt(codexUsageLabel, "%u%%", codexQuotaRemainingPercent);
   }
 }
 

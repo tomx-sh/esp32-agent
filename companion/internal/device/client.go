@@ -17,10 +17,10 @@ type Client struct {
 	http    *http.Client
 }
 
-type Usage struct {
-	Percent      int   `json:"percent"`
-	ResetAt      int64 `json:"resetAt"`
-	ResetCredits int   `json:"resetCredits"`
+type Quota struct {
+	RemainingPercent int   `json:"remainingPercent"`
+	ResetAt          int64 `json:"resetAt"`
+	ResetCredits     int   `json:"resetCredits"`
 }
 
 type Context struct {
@@ -33,7 +33,7 @@ type Message struct {
 }
 
 type Snapshot struct {
-	Usage   Usage
+	Quota   Quota
 	Context Context
 	Message Message
 }
@@ -49,8 +49,8 @@ func New(baseURL string, timeout time.Duration) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) SetUsage(ctx context.Context, usage Usage) error {
-	return c.post(ctx, "/codex/usage", usage)
+func (c *Client) SetQuota(ctx context.Context, quota Quota) error {
+	return c.post(ctx, "/codex/usage", quota)
 }
 
 func (c *Client) SetContext(ctx context.Context, remaining int) error {
@@ -71,7 +71,7 @@ func (c *Client) SetPet(ctx context.Context, name string, ttl time.Duration) err
 
 func (c *Client) Snapshot(ctx context.Context) (Snapshot, error) {
 	var result Snapshot
-	if err := c.get(ctx, "/codex/usage", &result.Usage); err != nil {
+	if err := c.get(ctx, "/codex/usage", &result.Quota); err != nil {
 		return Snapshot{}, err
 	}
 	if err := c.get(ctx, "/codex/context", &result.Context); err != nil {

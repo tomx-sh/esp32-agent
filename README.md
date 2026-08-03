@@ -56,7 +56,7 @@ esp32-agent run
 
 After installing hooks, open `/hooks` in Codex Desktop and trust the new definitions. The installer adds only `SessionStart`, `UserPromptSubmit`, `Stop`, and `SessionEnd`; it does not monitor tool calls or permission requests.
 
-The foreground bridge polls Codex account limits through `codex app-server`, sends quota/reset information to the device, and follows the active transcript path supplied by hooks for context usage. The transcript parser is isolated and best-effort because Codex does not guarantee that file format; failures leave the last context value untouched.
+The foreground bridge polls Codex account limits through `codex app-server`, converts the reported usage to quota remaining, sends quota/reset information to the device, and follows the active transcript path supplied by hooks for context usage. The transcript parser is isolated and best-effort because Codex does not guarantee that file format; failures leave the last context value untouched.
 
 See [companion/README.md](companion/README.md) for commands, configuration, and implementation details.
 

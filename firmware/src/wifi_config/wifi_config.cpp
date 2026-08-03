@@ -143,135 +143,55 @@ bool parse_brightness_request(uint8_t &brightness, String &error) {
   return false;
 }
 
-bool parse_percent_arg(const String &value, uint8_t &result) {
-  if (value.length() == 0) {
-    return false;
-  }
-
-  for (size_t i = 0; i < value.length(); ++i) {
-    if (!isDigit(value[i])) {
-      return false;
-    }
-  }
-
-  const int parsed = value.toInt();
-  if (parsed < 0 || parsed > 100) {
-    return false;
-  }
-
-  result = static_cast<uint8_t>(parsed);
-  return true;
-}
-
-bool parse_reset_at_arg(const String &value, uint64_t &result) {
-  if (value.length() == 0) {
-    return false;
-  }
-
-  uint64_t parsed = 0;
-  for (size_t i = 0; i < value.length(); ++i) {
-    if (!isDigit(value[i])) {
-      return false;
-    }
-    const uint8_t digit = static_cast<uint8_t>(value[i] - '0');
-    if (parsed > (UINT64_MAX - digit) / 10) {
-      return false;
-    }
-    parsed = parsed * 10 + digit;
-  }
-
-  result = parsed;
-  return true;
-}
-
-bool parse_reset_credits_arg(const String &value, uint16_t &result) {
-  if (value.length() == 0) {
-    return false;
-  }
-
-  for (size_t i = 0; i < value.length(); ++i) {
-    if (!isDigit(value[i])) {
-      return false;
-    }
-  }
-
-  const int parsed = value.toInt();
-  if (parsed < 0 || parsed > kMaxCodexResetCredits) {
-    return false;
-  }
-
-  result = static_cast<uint16_t>(parsed);
-  return true;
-}
-
 bool parse_codex_usage_request(
-    uint8_t &percent,
+    uint8_t &remainingPercent,
     uint64_t &resetAt,
     uint16_t &resetCredits,
     String &error) {
-  if (server.hasArg("plain") && server.arg("plain").length() > 0) {
-    JsonDocument doc;
-    DeserializationError jsonError = deserializeJson(doc, server.arg("plain"));
-    if (jsonError) {
-      error = "Invalid JSON";
-      return false;
-    }
-
-    JsonVariant value = doc["percent"];
-    if (!value.is<int>()) {
-      error = "Missing usage percent";
-      return false;
-    }
-
-    const int parsed = value.as<int>();
-    if (parsed < 0 || parsed > 100) {
-      error = "Usage percent must be between 0 and 100";
-      return false;
-    }
-
-    percent = static_cast<uint8_t>(parsed);
-
-    JsonVariant resetValue = doc["resetAt"];
-    if (!resetValue.is<uint64_t>()) {
-      error = "Missing or invalid resetAt Unix timestamp";
-      return false;
-    }
-    resetAt = resetValue.as<uint64_t>();
-
-    JsonVariant resetCreditsValue = doc["resetCredits"];
-    if (!resetCreditsValue.isNull()) {
-      if (!resetCreditsValue.is<int>()) {
-        error = "Reset credits must be a number";
-        return false;
-      }
-
-      const int parsedResetCredits = resetCreditsValue.as<int>();
-      if (parsedResetCredits < 0 || parsedResetCredits > kMaxCodexResetCredits) {
-        error = "Reset credits must be between 0 and 999";
-        return false;
-      }
-
-      resetCredits = static_cast<uint16_t>(parsedResetCredits);
-    }
-    return true;
+  if (!server.hasArg("plain") || server.arg("plain").length() == 0) {
+    error = "Expected a JSON body";
+    return false;
   }
 
-  if (server.hasArg("percent") && parse_percent_arg(server.arg("percent"), percent)) {
-    if (!server.hasArg("resetAt") || !parse_reset_at_arg(server.arg("resetAt"), resetAt)) {
-      error = "Missing or invalid resetAt Unix timestamp";
-      return false;
-    }
-    if (
-        server.hasArg("resetCredits") &&
-        !parse_reset_credits_arg(server.arg("resetCredits"), resetCredits)) {
-      error = "Reset credits must be between 0 and 999";
-      return false;
-    }
-    return true;
+  JsonDocument doc;
+  DeserializationError jsonError = deserializeJson(doc, server.arg("plain"));
+  if (jsonError) {
+    error = "Invalid JSON";
+    return false;
   }
 
-  error = "Usage percent must be between 0 and 100";
-  return false;
+  JsonVariant remainingValue = doc["remainingPercent"];
+  if (!remainingValue.is<int>()) {
+    error = "Missing remainingPercent";
+    return false;
+  }
+  const int parsedRemaining = remainingValue.as<int>();
+  if (parsedRemaining < 0 || parsedRemaining > 100) {
+    error = "remainingPercent must be between 0 and 100";
+    return false;
+  }
+
+  JsonVariant resetValue = doc["resetAt"];
+  if (!resetValue.is<uint64_t>()) {
+    error = "Missing or invalid resetAt Unix timestamp";
+    return false;
+  }
+
+  JsonVariant resetCreditsValue = doc["resetCredits"];
+  if (!resetCreditsValue.is<int>()) {
+    error = "Missing resetCredits";
+    return false;
+  }
+  const int parsedResetCredits = resetCreditsValue.as<int>();
+  if (parsedResetCredits < 0 || parsedResetCredits > kMaxCodexResetCredits) {
+    error = "resetCredits must be between 0 and 999";
+    return false;
+  }
+
+  remainingPercent = static_cast<uint8_t>(parsedRemaining);
+  resetAt = resetValue.as<uint64_t>();
+  resetCredits = static_cast<uint16_t>(parsedResetCredits);
+  return true;
 }
 
 bool parse_codex_context_request(uint8_t &remainingPercent, String &error) {
@@ -707,7 +627,7 @@ void handleBrightnessPost() {
 
 void handleCodexUsageGet() {
   JsonDocument doc;
-  doc["percent"] = ui_get_codex_usage_percent();
+  doc["remainingPercent"] = ui_get_codex_quota_remaining_percent();
   doc["resetAt"] = ui_get_codex_reset_at();
   doc["resetCredits"] = ui_get_codex_reset_credits();
   doc["min"] = 0;
@@ -720,24 +640,24 @@ void handleCodexUsageGet() {
 }
 
 void handleCodexUsagePost() {
-  uint8_t percent = 0;
-  uint64_t resetAt = ui_get_codex_reset_at();
-  uint16_t resetCredits = ui_get_codex_reset_credits();
+  uint8_t remainingPercent = 0;
+  uint64_t resetAt = 0;
+  uint16_t resetCredits = 0;
   String error;
-  if (!parse_codex_usage_request(percent, resetAt, resetCredits, error)) {
+  if (!parse_codex_usage_request(remainingPercent, resetAt, resetCredits, error)) {
     server.send(400, "text/plain", error);
     return;
   }
 
-  ui_set_codex_usage_percent(percent);
+  ui_set_codex_quota_remaining_percent(remainingPercent);
   ui_set_codex_reset_at(resetAt);
   ui_set_codex_reset_credits(resetCredits);
   char response[144];
   snprintf(
       response,
       sizeof(response),
-      "Codex usage set to %u%% (resetAt %llu, %u reset credits)",
-      static_cast<unsigned int>(percent),
+      "Codex quota set to %u%% left (resetAt %llu, %u reset credits)",
+      static_cast<unsigned int>(remainingPercent),
       static_cast<unsigned long long>(resetAt),
       static_cast<unsigned int>(resetCredits));
   server.send(

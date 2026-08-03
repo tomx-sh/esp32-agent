@@ -2,11 +2,11 @@ package codex
 
 import "testing"
 
-func TestParseLimits(t *testing.T) {
+func TestParseLimitsConvertsUsedToRemaining(t *testing.T) {
 	data := []byte(`{
       "rateLimits": {
         "planType": "plus",
-        "primary": {"usedPercent": 17.4, "windowDurationMins": 10080, "resetsAt": 1786345996}
+        "primary": {"usedPercent": 43, "windowDurationMins": 10080, "resetsAt": 1786345996}
       },
       "rateLimitResetCredits": {"availableCount": 2, "credits": null}
     }`)
@@ -14,7 +14,7 @@ func TestParseLimits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if limits.UsedPercent != 17 || limits.ResetAt != 1786345996 || limits.ResetCredits != 2 || limits.WindowMinutes != 10080 || limits.PlanType != "plus" {
+	if limits.RemainingPercent != 57 || limits.ResetAt != 1786345996 || limits.ResetCredits != 2 || limits.WindowMinutes != 10080 || limits.PlanType != "plus" {
 		t.Fatalf("unexpected limits: %#v", limits)
 	}
 }

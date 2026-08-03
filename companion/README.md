@@ -88,7 +88,7 @@ Open `/hooks` in Codex Desktop after installation and trust the four ESP32 Agent
 
 ## Data sources
 
-- Quota percentage, reset time, and reset-credit count come from `account/rateLimits/read` on a short-lived `codex app-server` process.
+- Quota remaining, reset time, and reset-credit count come from `account/rateLimits/read` on a short-lived `codex app-server` process. The companion converts Codex's raw used percentage at this adapter boundary so every downstream component uses the same remaining-percentage meaning.
 - GIF state and generic messages come from `SessionStart`, `UserPromptSubmit`, `Stop`, and `SessionEnd` hooks.
 - Context percentage comes from the most recent `token_count` record in the active transcript path supplied by Codex hooks.
 

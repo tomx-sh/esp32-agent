@@ -280,12 +280,12 @@ func (a *application) syncQuota(ctx context.Context, cfg config.Config, client *
 	if err != nil {
 		return err
 	}
-	if err := client.SetUsage(ctx, device.Usage{
-		Percent: limits.UsedPercent, ResetAt: limits.ResetAt, ResetCredits: limits.ResetCredits,
+	if err := client.SetQuota(ctx, device.Quota{
+		RemainingPercent: limits.RemainingPercent, ResetAt: limits.ResetAt, ResetCredits: limits.ResetCredits,
 	}); err != nil {
 		return err
 	}
-	fmt.Fprintf(a.out, "Quota synced: %d%% used", limits.UsedPercent)
+	fmt.Fprintf(a.out, "Quota synced: %d%% left", limits.RemainingPercent)
 	if limits.ResetAt > 0 {
 		fmt.Fprintf(a.out, ", resets %s", time.Unix(limits.ResetAt, 0).Local().Format(time.RFC822))
 	}
@@ -402,9 +402,9 @@ func (a *application) showDevice(ctx context.Context) error {
 		return err
 	}
 	fmt.Fprintln(a.out, "Device connected")
-	fmt.Fprintf(a.out, "  Quota:   %d%% used\n", snapshot.Usage.Percent)
+	fmt.Fprintf(a.out, "  Quota:   %d%% left\n", snapshot.Quota.RemainingPercent)
 	fmt.Fprintf(a.out, "  Context: %d%% remaining\n", snapshot.Context.RemainingPercent)
-	fmt.Fprintf(a.out, "  Credits: %d\n", snapshot.Usage.ResetCredits)
+	fmt.Fprintf(a.out, "  Credits: %d\n", snapshot.Quota.ResetCredits)
 	fmt.Fprintf(a.out, "  Message: %s\n", strconv.Quote(snapshot.Message.Message))
 	return nil
 }

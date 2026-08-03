@@ -96,24 +96,24 @@
       <br/>
       <code>curl -X POST {{BASE_URL}}/codex/context -H 'Content-Type: application/json' -d '{"remainingPercent":68}'</code>
 
-      <h3>Credits</h3>
+      <h3>Quota</h3>
       <form id="codex-usage-form">
-        <label for="codex-usage">Usage</label>
-        <input id="codex-usage" name="percent" type="range" min="0" max="100" value="0">
-        <input id="codex-usage-number" type="number" min="0" max="100" value="0">
+        <label for="codex-usage">7-day limit</label>
+        <input id="codex-usage" name="remainingPercent" type="range" min="0" max="100" value="100">
+        <input id="codex-usage-number" type="number" min="0" max="100" value="100">
         <br/>
         <label for="codex-reset-at">Reset at</label>
         <input id="codex-reset-at" type="datetime-local" step="60">
         <br/>
         <label for="codex-reset-credits">Reset credits available</label>
         <input id="codex-reset-credits" type="number" min="0" max="999" value="0">
-        <button type="submit">Set usage</button>
+        <button type="submit">Set quota</button>
       </form>
       <p id="codex-usage-status"></p>
       <p>Programmatic commands:</p>
       <code>curl {{BASE_URL}}/codex/usage</code>
       <br/>
-      <code>curl -X POST {{BASE_URL}}/codex/usage -H 'Content-Type: application/json' -d '{"percent":42,"resetAt":1786147200,"resetCredits":2}'</code>
+      <code>curl -X POST {{BASE_URL}}/codex/usage -H 'Content-Type: application/json' -d '{"remainingPercent":57,"resetAt":1786147200,"resetCredits":2}'</code>
     </section>
 
     <section>
@@ -221,7 +221,7 @@
       async function refreshCodexUsage() {
         const response = await fetch('/codex/usage');
         const data = await response.json();
-        syncCodexUsageControls(data.percent);
+        syncCodexUsageControls(data.remainingPercent);
         codexResetAt.value = formatResetAtInput(data.resetAt);
         codexResetCredits.value = Math.max(0, Number(data.resetCredits) || 0);
       }
@@ -462,20 +462,20 @@
 
       codexUsageForm.addEventListener('submit', async (event) => {
         event.preventDefault();
-        const percent = Number(codexUsage.value);
+        const remainingPercent = Number(codexUsage.value);
         const resetAt = parseResetAtInput(codexResetAt.value);
         const resetCredits = Number(codexResetCredits.value);
-        codexUsageStatus.textContent = 'Setting Codex usage...';
+        codexUsageStatus.textContent = 'Setting Codex quota...';
 
         try {
           const response = await fetch('/codex/usage', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ percent, resetAt, resetCredits }),
+            body: JSON.stringify({ remainingPercent, resetAt, resetCredits }),
           });
           codexUsageStatus.textContent = await response.text();
         } catch (error) {
-          codexUsageStatus.textContent = 'Codex usage request failed';
+          codexUsageStatus.textContent = 'Codex quota request failed';
         }
       });
 
