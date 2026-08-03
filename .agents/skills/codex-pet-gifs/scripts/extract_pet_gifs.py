@@ -12,19 +12,22 @@ from typing import Any
 from PIL import Image
 
 
-DEFAULT_ASAR = Path("/Applications/Codex.app/Contents/Resources/app.asar")
-DEFAULT_STATES = [
-    "idle",
-    "running-right",
-    "running-left",
-    "waving",
-    "jumping",
-    "failed",
-    "waiting",
-    "thinking",
-    "review",
+ASAR_CANDIDATES = [
+    Path("/Applications/ChatGPT.app/Contents/Resources/app.asar"),
+    Path("/Applications/Codex.app/Contents/Resources/app.asar"),
 ]
-ATLAS_SIZE = (1536, 1872)
+ANIMATIONS = [
+    ("idle", [1680, 660, 660, 840, 840, 1920]),
+    ("running-right", [120, 120, 120, 120, 120, 120, 120, 220]),
+    ("running-left", [120, 120, 120, 120, 120, 120, 120, 220]),
+    ("waving", [140, 140, 140, 280]),
+    ("jumping", [140, 140, 140, 140, 280]),
+    ("failed", [140, 140, 140, 140, 140, 140, 140, 240]),
+    ("waiting", [150, 150, 150, 150, 150, 260]),
+    ("running", [120, 120, 120, 120, 120, 220]),
+    ("review", [150, 150, 150, 150, 150, 280]),
+]
+ATLAS_SIZES = {(1536, 1872): 1, (1536, 2288): 2}
 CELL_SIZE = (192, 208)
 
 
@@ -33,15 +36,16 @@ def parse_args() -> argparse.Namespace:
         description="Extract a Codex Desktop built-in pet WebP atlas and generate one GIF per state."
     )
     parser.add_argument("--pet", required=True, help="Built-in pet id, for example codex, hoots, rocky, or seedy.")
-    parser.add_argument("--asar", type=Path, default=DEFAULT_ASAR, help=f"Path to app.asar. Default: {DEFAULT_ASAR}")
+    parser.add_argument("--asar", type=Path, help="Path to app.asar. Defaults to the installed ChatGPT or Codex app.")
     parser.add_argument("--output-dir", type=Path, required=True, help="Directory where the atlas and GIFs are written.")
-    parser.add_argument("--duration-ms", type=int, default=500, help="GIF frame duration in milliseconds. Default: 500.")
-    parser.add_argument(
-        "--keep-empty",
-        action="store_true",
-        help="Keep fully transparent atlas cells instead of dropping unused frames.",
-    )
     return parser.parse_args()
+
+
+def default_asar() -> Path:
+    for candidate in ASAR_CANDIDATES:
+        if candidate.is_file():
+            return candidate
+    raise ValueError("could not find ChatGPT.app or Codex.app in /Applications")
 
 
 def load_asar(asar_path: Path) -> tuple[bytes, dict[str, Any], int]:
@@ -93,25 +97,19 @@ def extract_asset(data: bytes, data_start: int, meta: dict[str, Any], output_pat
     output_path.write_bytes(data[offset : offset + size])
 
 
-def frame_is_empty(frame: Image.Image) -> bool:
-    return frame.getchannel("A").getbbox() is None
-
-
-def write_state_gifs(atlas_path: Path, output_dir: Path, pet: str, duration_ms: int, keep_empty: bool) -> None:
+def write_state_gifs(atlas_path: Path, output_dir: Path, pet: str) -> None:
     atlas = Image.open(atlas_path).convert("RGBA")
-    if atlas.size != ATLAS_SIZE:
-        raise ValueError(f"unexpected atlas size {atlas.size}; expected {ATLAS_SIZE}")
+    version = ATLAS_SIZES.get(atlas.size)
+    if version is None:
+        raise ValueError(f"unexpected atlas size {atlas.size}; expected one of {list(ATLAS_SIZES)}")
+    print(f"sprite-sheet format: v{version}")
 
     cell_w, cell_h = CELL_SIZE
-    for row, state in enumerate(DEFAULT_STATES):
+    for row, (state, durations) in enumerate(ANIMATIONS):
         frames: list[Image.Image] = []
-        dropped = 0
 
-        for col in range(8):
+        for col in range(len(durations)):
             frame = atlas.crop((col * cell_w, row * cell_h, (col + 1) * cell_w, (row + 1) * cell_h))
-            if not keep_empty and frame_is_empty(frame):
-                dropped += 1
-                continue
             frames.append(frame)
 
         if not frames:
@@ -122,24 +120,25 @@ def write_state_gifs(atlas_path: Path, output_dir: Path, pet: str, duration_ms: 
             gif_path,
             save_all=True,
             append_images=frames[1:],
-            duration=duration_ms,
+            duration=durations,
             loop=0,
             disposal=2,
         )
-        print(f"{gif_path}: {len(frames)} frames, {duration_ms} ms/frame, dropped {dropped}")
+        print(f"{gif_path}: {len(frames)} frames, {sum(durations)} ms/cycle")
 
 
 def main() -> None:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    data, header, data_start = load_asar(args.asar)
+    asar_path = args.asar or default_asar()
+    data, header, data_start = load_asar(asar_path)
     internal_path, meta = find_pet_asset(header, args.pet)
     atlas_path = args.output_dir / f"{args.pet}-spritesheet.webp"
     extract_asset(data, data_start, meta, atlas_path)
     print(f"{atlas_path}: extracted {internal_path}")
 
-    write_state_gifs(atlas_path, args.output_dir, args.pet, args.duration_ms, args.keep_empty)
+    write_state_gifs(atlas_path, args.output_dir, args.pet)
 
 
 if __name__ == "__main__":

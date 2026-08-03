@@ -29,17 +29,17 @@ func TestActionForMapsEveryManagedEvent(t *testing.T) {
 		message string
 		muted   bool
 	}{
-		{name: "session start", event: Event{Name: "SessionStart"}, pet: "codex-waving", message: "Codex is ready", muted: true},
-		{name: "prompt", event: Event{Name: "UserPromptSubmit"}, pet: "codex-thinking", message: "Codex is working"},
-		{name: "approval", event: Event{Name: "PermissionRequest"}, pet: "codex-waiting", message: "Approval needed"},
-		{name: "tool result", event: Event{Name: "PostToolUse", ToolResponse: json.RawMessage(`{"exit_code":0}`)}, pet: "codex-review", message: "Reviewing tool result", muted: true},
-		{name: "tool failure", event: Event{Name: "PostToolUse", ToolResponse: json.RawMessage(`{"exit_code":2}`)}, pet: "codex-failed", message: "Tool failed"},
-		{name: "pre compact", event: Event{Name: "PreCompact"}, pet: "codex-review", message: "Compacting context", muted: true},
-		{name: "post compact", event: Event{Name: "PostCompact"}, pet: "codex-thinking", message: "Continuing with compacted context", muted: true},
-		{name: "subagent start", event: Event{Name: "SubagentStart"}, pet: "codex-thinking", message: "Subagent working", muted: true},
-		{name: "subagent stop", event: Event{Name: "SubagentStop"}, pet: "codex-review", message: "Reviewing subagent result", muted: true},
-		{name: "stop", event: Event{Name: "Stop"}, pet: "codex-idle", message: "Ready", muted: true},
-		{name: "session end", event: Event{Name: "SessionEnd"}, pet: "codex-idle", message: "Session ended", muted: true},
+		{name: "session start", event: Event{Name: "SessionStart"}, pet: "waving", message: "Codex is ready", muted: true},
+		{name: "prompt", event: Event{Name: "UserPromptSubmit"}, pet: "running", message: "Codex is working"},
+		{name: "approval", event: Event{Name: "PermissionRequest"}, pet: "waiting", message: "Approval needed"},
+		{name: "tool result", event: Event{Name: "PostToolUse", ToolResponse: json.RawMessage(`{"exit_code":0}`)}, message: "Tool finished", muted: true},
+		{name: "tool failure", event: Event{Name: "PostToolUse", ToolResponse: json.RawMessage(`{"exit_code":2}`)}, pet: "failed", message: "Tool failed"},
+		{name: "pre compact", event: Event{Name: "PreCompact"}, message: "Compacting context", muted: true},
+		{name: "post compact", event: Event{Name: "PostCompact"}, pet: "running", message: "Continuing with compacted context", muted: true},
+		{name: "subagent start", event: Event{Name: "SubagentStart"}, pet: "running", message: "Subagent working", muted: true},
+		{name: "subagent stop", event: Event{Name: "SubagentStop"}, message: "Subagent finished", muted: true},
+		{name: "stop", event: Event{Name: "Stop"}, pet: "review", message: "Ready", muted: true},
+		{name: "session end", event: Event{Name: "SessionEnd"}, pet: "idle", message: "Session ended", muted: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

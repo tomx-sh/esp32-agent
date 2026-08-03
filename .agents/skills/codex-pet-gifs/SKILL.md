@@ -1,6 +1,6 @@
 ---
 name: codex-pet-gifs
-description: Use when locating Codex Desktop built-in pet WebP spritesheets in app.asar, extracting pets such as codex, hoots, rocky, seedy, stacky, bsod, dewey, fireball, or null-signal, and converting their 8x9 state atlases into one animated GIF per state.
+description: Use when locating Codex Desktop built-in pet WebP spritesheets in app.asar, extracting pets such as codex, hoots, rocky, seedy, stacky, bsod, dewey, fireball, or null-signal, and converting their v1 or v2 state atlases into one animated GIF per state.
 ---
 
 # Codex Pet GIFs
@@ -16,7 +16,7 @@ ${CODEX_HOME:-$HOME/.codex}/pets/<pet-name>/
 Built-in pets live inside:
 
 ```text
-/Applications/Codex.app/Contents/Resources/app.asar
+/Applications/ChatGPT.app/Contents/Resources/app.asar
 ```
 
 Their internal paths look like:
@@ -36,7 +36,6 @@ Use the bundled script. Prefer the Codex bundled Python runtime when available b
   .agents/skills/codex-pet-gifs/scripts/extract_pet_gifs.py \
   --pet codex \
   --output-dir /private/tmp/codex-pet-gifs \
-  --duration-ms 500
 ```
 
 The script extracts the WebP atlas and writes one GIF per state:
@@ -49,19 +48,19 @@ The script extracts the WebP atlas and writes one GIF per state:
 <pet>-jumping.gif
 <pet>-failed.gif
 <pet>-waiting.gif
-<pet>-thinking.gif
+<pet>-running.gif
 <pet>-review.gif
 ```
 
-The app's internal `running` state is emitted as `thinking`, because that row represents active work / processing in the UI.
+The generated GIFs preserve Codex Desktop's per-frame timing. Non-idle GIFs contain one cycle; callers can play three cycles and then return to idle to match Desktop behavior.
 
 ## Atlas Contract
 
 Built-in and custom pet sheets use the Codex pet atlas contract:
 
 ```text
-1536x1872 image
-8 columns x 9 rows
+v1: 1536x1872 image, 8 columns x 9 rows
+v2: 1536x2288 image, 8 columns x 11 rows
 192x208 cell size
 transparent unused cells
 ```
@@ -76,8 +75,8 @@ waving
 jumping
 failed
 waiting
-running/thinking
+running
 review
 ```
 
-The script drops fully transparent frames by default, which removes unused cells at the end of shorter animations.
+V2 rows 9 and 10 contain cursor-direction poses and are intentionally not emitted as task-state GIFs.

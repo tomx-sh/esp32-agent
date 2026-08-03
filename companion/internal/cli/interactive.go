@@ -21,6 +21,7 @@ const (
 	actionConfigure interactiveAction = "configure"
 	actionTest      interactiveAction = "test"
 	actionSync      interactiveAction = "sync"
+	actionPetSync   interactiveAction = "pet-sync"
 	actionRun       interactiveAction = "run"
 	actionHooks     interactiveAction = "hooks"
 	actionStatus    interactiveAction = "status"
@@ -66,6 +67,14 @@ func (a *application) interactive(ctx context.Context) error {
 			if err != nil {
 				a.logError(err)
 			}
+		case actionPetSync:
+			cfg, client, err := a.loadClient()
+			if err == nil {
+				err = a.syncPet(ctx, cfg, client)
+			}
+			if err != nil {
+				a.logError(err)
+			}
 		case actionRun:
 			return a.runBridge(ctx)
 		case actionHooks:
@@ -100,6 +109,7 @@ func (a *application) promptAction(ctx context.Context) (interactiveAction, erro
 					huh.NewOption("Configure settings", actionConfigure),
 					huh.NewOption("Test device connection", actionTest),
 					huh.NewOption("Sync Codex data now", actionSync),
+					huh.NewOption("Sync pet with Codex Desktop", actionPetSync),
 					huh.NewOption("Run foreground bridge", actionRun),
 					huh.NewOption("Install Codex Desktop hooks", actionHooks),
 					huh.NewOption("Show status", actionStatus),
@@ -222,7 +232,7 @@ func (a *application) runSetup(ctx context.Context, hooksPath string) error {
 	fmt.Fprintf(a.out, "  Hooks file:    %s\n", hooksPath)
 	if install {
 		fmt.Fprintf(a.out, "  Hooks:         added commands for %s\n", managedEventsSummary())
-		fmt.Fprintln(a.out, "Next: open /hooks in Codex Desktop and review/trust the new definitions.")
+		fmt.Fprintln(a.out, "Next: open Settings > Hooks in Codex Desktop and review/trust the new definitions.")
 	} else {
 		fmt.Fprintln(a.out, "  Hooks:         not installed (skipped)")
 		fmt.Fprintln(a.out, "Next: run `esp32-agent hooks install` when you want to enable lifecycle updates.")

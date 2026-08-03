@@ -5,7 +5,9 @@ go 1.25.8
 require (
 	charm.land/huh/v2 v2.0.3
 	github.com/charmbracelet/x/term v0.2.2
+	github.com/soniakeys/quant v1.0.0
 	github.com/spf13/cobra v1.10.2
+	golang.org/x/image v0.44.0
 )
 
 require (

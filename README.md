@@ -49,12 +49,13 @@ The normal first-time flow is:
 
 ```sh
 esp32-agent setup
+esp32-agent pet sync
 esp32-agent run
 ```
 
 Setup saves the settings, tests the device, and explicitly asks before changing
-the global Codex hooks file. After installing hooks, open `/hooks` in Codex
-Desktop and trust the new definitions. The installer adds lifecycle hooks for
+the global Codex hooks file. After installing hooks, open **Settings > Hooks**
+in Codex Desktop and trust the new definitions. The installer adds lifecycle hooks for
 sessions, prompts, tool results, approvals, compaction, subagents, and turn
 completion. These drive semantic pet states and concise messages; they never
 approve, deny, block, or rewrite Codex actions. Run
@@ -74,4 +75,4 @@ cd firmware
 ./scripts/generate_fonts.sh
 ```
 
-The firmware exposes the companion endpoints under `/pet`, `/codex/usage`, `/codex/message`, and `/codex/context`.
+The firmware exposes the companion endpoints under `/pet`, `/pet-pack`, `/sprites`, `/codex/usage`, `/codex/message`, and `/codex/context`.

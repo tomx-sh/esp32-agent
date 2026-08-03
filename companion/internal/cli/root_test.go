@@ -22,7 +22,7 @@ func TestHelpListsMainOperations(t *testing.T) {
 	if err := command.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"configure", "device", "hooks", "run", "setup", "status", "sync"} {
+	for _, name := range []string{"configure", "device", "hooks", "pet", "run", "setup", "status", "sync"} {
 		if !strings.Contains(out.String(), name) {
 			t.Fatalf("help does not contain %q:\n%s", name, out.String())
 		}
@@ -31,12 +31,12 @@ func TestHelpListsMainOperations(t *testing.T) {
 
 func TestNoArgumentsStartsInteractiveGuide(t *testing.T) {
 	var out bytes.Buffer
-	command := New(Options{In: strings.NewReader("8\n"), Out: &out, ErrOut: &out, Version: "test"})
+	command := New(Options{In: strings.NewReader("9\n"), Out: &out, ErrOut: &out, Version: "test"})
 	command.SetArgs(nil)
 	if err := command.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "ESP32 Agent Companion") || !strings.Contains(out.String(), "Set up companion") || !strings.Contains(out.String(), "Configure settings") {
+	if !strings.Contains(out.String(), "ESP32 Agent Companion") || !strings.Contains(out.String(), "Set up companion") || !strings.Contains(out.String(), "Configure settings") || !strings.Contains(out.String(), "Sync pet with Codex Desktop") {
 		t.Fatalf("interactive guide missing expected choices:\n%s", out.String())
 	}
 }
@@ -120,7 +120,7 @@ func TestSetupConfiguresTestsAndInstallsHooks(t *testing.T) {
 		"Setup complete",
 		"Hooks file:    " + hooksPath,
 		"added commands for 10 Codex lifecycle events",
-		"open /hooks in Codex Desktop",
+		"open Settings > Hooks in Codex Desktop",
 	} {
 		if !strings.Contains(out.String(), expected) {
 			t.Fatalf("setup output does not contain %q:\n%s", expected, out.String())

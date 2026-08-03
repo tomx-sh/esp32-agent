@@ -11,6 +11,7 @@ import (
 
 	"github.com/tomx-sh/esp32-agent/companion/internal/codex"
 	"github.com/tomx-sh/esp32-agent/companion/internal/device"
+	"github.com/tomx-sh/esp32-agent/companion/internal/pet"
 	"github.com/tomx-sh/esp32-agent/companion/internal/state"
 )
 
@@ -70,28 +71,28 @@ func ActionFor(event Event) (Action, bool) {
 		if event.Source == "compact" {
 			return Action{}, false
 		}
-		return Action{Pet: "codex-waving", TTL: 4 * time.Second, Message: "Codex is ready", Muted: true}, true
+		return Action{Pet: "waving", TTL: pet.BurstDuration("waving"), Message: "Codex is ready", Muted: true}, true
 	case "UserPromptSubmit":
-		return Action{Pet: "codex-thinking", Message: "Codex is working", Muted: false}, true
+		return Action{Pet: "running", TTL: pet.BurstDuration("running"), Message: "Codex is working", Muted: false}, true
 	case "PermissionRequest":
-		return Action{Pet: "codex-waiting", Message: "Approval needed", Muted: false}, true
+		return Action{Pet: "waiting", TTL: pet.BurstDuration("waiting"), Message: "Approval needed", Muted: false}, true
 	case "PostToolUse":
 		if toolFailed(event.ToolResponse) {
-			return Action{Pet: "codex-failed", Message: "Tool failed", Muted: false}, true
+			return Action{Pet: "failed", TTL: pet.BurstDuration("failed"), Message: "Tool failed", Muted: false}, true
 		}
-		return Action{Pet: "codex-review", Message: "Reviewing tool result", Muted: true}, true
+		return Action{Message: "Tool finished", Muted: true}, true
 	case "PreCompact":
-		return Action{Pet: "codex-review", Message: "Compacting context", Muted: true}, true
+		return Action{Message: "Compacting context", Muted: true}, true
 	case "PostCompact":
-		return Action{Pet: "codex-thinking", Message: "Continuing with compacted context", Muted: true}, true
+		return Action{Pet: "running", TTL: pet.BurstDuration("running"), Message: "Continuing with compacted context", Muted: true}, true
 	case "SubagentStart":
-		return Action{Pet: "codex-thinking", Message: "Subagent working", Muted: true}, true
+		return Action{Pet: "running", TTL: pet.BurstDuration("running"), Message: "Subagent working", Muted: true}, true
 	case "SubagentStop":
-		return Action{Pet: "codex-review", Message: "Reviewing subagent result", Muted: true}, true
+		return Action{Message: "Subagent finished", Muted: true}, true
 	case "Stop":
-		return Action{Pet: "codex-idle", Message: "Ready", Muted: true}, true
+		return Action{Pet: "review", TTL: pet.BurstDuration("review"), Message: "Ready", Muted: true}, true
 	case "SessionEnd":
-		return Action{Pet: "codex-idle", Message: "Session ended", Muted: true}, true
+		return Action{Pet: "idle", Message: "Session ended", Muted: true}, true
 	default:
 		return Action{}, false
 	}

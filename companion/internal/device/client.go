@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -38,6 +39,28 @@ type Snapshot struct {
 	Message Message
 }
 
+type Sprite struct {
+	Name      string `json:"name"`
+	Size      int    `json:"size"`
+	Active    bool   `json:"active"`
+	IsDefault bool   `json:"isDefault"`
+}
+
+type Sprites struct {
+	StorageAvailable bool     `json:"storageAvailable"`
+	ActiveSprite     string   `json:"activeSprite"`
+	DefaultSprite    string   `json:"defaultSpriteName"`
+	Items            []Sprite `json:"sprites"`
+}
+
+type PetPack struct {
+	PetID         string            `json:"petId"`
+	DisplayName   string            `json:"displayName"`
+	SourceHash    string            `json:"sourceHash"`
+	SpriteVersion int               `json:"spriteVersion"`
+	Sprites       map[string]string `json:"sprites"`
+}
+
 func New(baseURL string, timeout time.Duration) (*Client, error) {
 	parsed, err := url.Parse(baseURL)
 	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
@@ -67,6 +90,55 @@ func (c *Client) SetPet(ctx context.Context, name string, ttl time.Duration) err
 		TTLMS int64  `json:"ttlMs"`
 	}{Name: name, TTLMS: ttl.Milliseconds()}
 	return c.post(ctx, "/pet", payload)
+}
+
+func (c *Client) UploadSprite(ctx context.Context, name string, data []byte) error {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", name+".gif")
+	if err != nil {
+		return fmt.Errorf("create sprite upload: %w", err)
+	}
+	if _, err := part.Write(data); err != nil {
+		return fmt.Errorf("write sprite upload: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("finish sprite upload: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/sprites/upload?name="+url.QueryEscape(name), &body)
+	if err != nil {
+		return fmt.Errorf("create sprite upload request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return c.do(req, nil)
+}
+
+func (c *Client) Sprites(ctx context.Context) (Sprites, error) {
+	var result Sprites
+	if err := c.get(ctx, "/sprites", &result); err != nil {
+		return Sprites{}, err
+	}
+	return result, nil
+}
+
+func (c *Client) DeleteSprite(ctx context.Context, name string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.baseURL+"/sprites?name="+url.QueryEscape(name), nil)
+	if err != nil {
+		return fmt.Errorf("create sprite delete request: %w", err)
+	}
+	return c.do(req, nil)
+}
+
+func (c *Client) ActivatePetPack(ctx context.Context, pack PetPack) error {
+	return c.post(ctx, "/pet-pack", pack)
+}
+
+func (c *Client) PetPack(ctx context.Context) (PetPack, error) {
+	var result PetPack
+	if err := c.get(ctx, "/pet-pack", &result); err != nil {
+		return PetPack{}, err
+	}
+	return result, nil
 }
 
 func (c *Client) Snapshot(ctx context.Context) (Snapshot, error) {

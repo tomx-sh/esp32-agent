@@ -24,3 +24,21 @@ func TestParseLimitsRequiresPrimaryWindow(t *testing.T) {
 		t.Fatal("parseLimits unexpectedly accepted a missing primary window")
 	}
 }
+
+func TestParseSelectedPet(t *testing.T) {
+	selected, err := parseSelectedPet([]byte(`{"config":{"desktop":{"selected-avatar-id":"custom:retrobyte"}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selected != "custom:retrobyte" {
+		t.Fatalf("unexpected selected pet %q", selected)
+	}
+
+	selected, err = parseSelectedPet([]byte(`{"config":{"desktop":{}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selected != "codex" {
+		t.Fatalf("expected default codex pet, got %q", selected)
+	}
+}

@@ -74,6 +74,7 @@ func New(options Options) *cobra.Command {
 		app.statusCommand(),
 		app.hookCommand(),
 		app.hooksCommand(),
+		app.petCommand(),
 		app.deviceCommand(),
 	)
 	return root
@@ -251,7 +252,7 @@ func (a *application) deviceCommand() *cobra.Command {
 	var ttl time.Duration
 	pet := &cobra.Command{
 		Use:   "pet NAME",
-		Short: "Show a bundled pet sprite",
+		Short: "Show a sprite or active pet state",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, client, err := a.loadClient()
@@ -493,7 +494,7 @@ func (a *application) reportConfigurationSaved() {
 func (a *application) reportHooksInstalled(path string) {
 	fmt.Fprintf(a.out, "Added ESP32 Agent commands for %s to %s.\n", managedEventsSummary(), path)
 	fmt.Fprintf(a.out, "Events: %s.\n", managedEventsText())
-	fmt.Fprintln(a.out, "Next: open /hooks in Codex Desktop and review/trust the new definitions.")
+	fmt.Fprintln(a.out, "Next: open Settings > Hooks in Codex Desktop and review/trust the new definitions.")
 }
 
 func managedEventsSummary() string {

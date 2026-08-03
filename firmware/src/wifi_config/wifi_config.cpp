@@ -34,6 +34,21 @@ constexpr char kSecondaryNtpServer[] = "time.nist.gov";
 constexpr char kSpriteDir[] = "/sprites";
 constexpr char kSpriteUploadPath[] = "/sprites/.upload.gif";
 constexpr char kDefaultSpriteName[] = "idle";
+constexpr char kPetPackPath[] = "/pet-pack.json";
+constexpr char kPetPackBackupPath[] = "/pet-pack.backup.json";
+constexpr char kPetPackUploadPath[] = "/pet-pack.upload.json";
+constexpr size_t kPetStateCount = 9;
+constexpr const char *kPetStates[kPetStateCount] = {
+    "idle",
+    "running-right",
+    "running-left",
+    "waving",
+    "jumping",
+    "failed",
+    "waiting",
+    "running",
+    "review",
+};
 
 WebServer server(80);
 String stationStatus = "Not connected";
@@ -58,6 +73,11 @@ bool petMessageExpires = false;
 bool spriteStorageReady = false;
 bool defaultSpriteLoadPending = false;
 unsigned long defaultSpriteLoadAtMs = 0;
+String activePetPackId = "";
+String activePetPackDisplayName = "";
+String activePetPackSourceHash = "";
+uint8_t activePetPackSpriteVersion = 0;
+String activePetPackSprites[kPetStateCount];
 
 void show_default_pet_sprite();
 
@@ -292,6 +312,23 @@ String sprite_lvgl_path(const String &name) {
   return "S:" + sprite_file_path(name);
 }
 
+int pet_state_index(const String &name) {
+  for (size_t i = 0; i < kPetStateCount; ++i) {
+    if (name == kPetStates[i]) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
+}
+
+String resolve_sprite_name(const String &name) {
+  const int stateIndex = pet_state_index(name);
+  if (stateIndex >= 0 && activePetPackSprites[stateIndex].length() > 0) {
+    return activePetPackSprites[stateIndex];
+  }
+  return name;
+}
+
 bool ensure_sprite_dir() {
   if (!spriteStorageReady) {
     return false;
@@ -336,6 +373,151 @@ void seed_default_pet_sprites() {
         path.c_str(),
         static_cast<unsigned>(sprite.size));
   }
+}
+
+void remove_legacy_pet_sprites() {
+  constexpr const char *legacyNames[] = {
+      "claude-code-notification",
+      "claude-code-post-tool-use",
+      "claude-code-pre-tool-use",
+      "claude-code-session-start",
+      "claude-code-stop",
+      "claude-code-user-prompt-submit",
+      "codex-failed",
+      "codex-idle",
+      "codex-jumping",
+      "codex-review",
+      "codex-running-left",
+      "codex-running-right",
+      "codex-thinking",
+      "codex-waiting",
+      "codex-waving",
+  };
+  for (const char *name : legacyNames) {
+    const String path = sprite_file_path(name);
+    if (LittleFS.exists(path)) {
+      LittleFS.remove(path);
+    }
+  }
+}
+
+void clear_active_pet_pack() {
+  activePetPackId = "";
+  activePetPackDisplayName = "";
+  activePetPackSourceHash = "";
+  activePetPackSpriteVersion = 0;
+  for (size_t i = 0; i < kPetStateCount; ++i) {
+    activePetPackSprites[i] = "";
+  }
+}
+
+bool validate_pet_pack(JsonObjectConst root, String &error) {
+  const char *petId = root["petId"] | "";
+  const char *displayName = root["displayName"] | "";
+  const char *sourceHash = root["sourceHash"] | "";
+  const int spriteVersion = root["spriteVersion"] | 0;
+  JsonObjectConst sprites = root["sprites"].as<JsonObjectConst>();
+
+  if (strlen(petId) == 0 || strlen(petId) > 96) {
+    error = "Invalid petId";
+    return false;
+  }
+  if (strlen(displayName) == 0 || strlen(displayName) > 96) {
+    error = "Invalid displayName";
+    return false;
+  }
+  if (strlen(sourceHash) != 64) {
+    error = "Invalid sourceHash";
+    return false;
+  }
+  if (spriteVersion != 1 && spriteVersion != 2) {
+    error = "spriteVersion must be 1 or 2";
+    return false;
+  }
+  if (sprites.isNull()) {
+    error = "Missing sprites";
+    return false;
+  }
+  for (size_t i = 0; i < kPetStateCount; ++i) {
+    const char *spriteName = sprites[kPetStates[i]] | "";
+    const String spriteNameValue(spriteName);
+    if (!is_valid_sprite_name(spriteNameValue)) {
+      error = "Invalid sprite name for state " + String(kPetStates[i]) + ": " + spriteNameValue;
+      return false;
+    }
+    const String spritePath = sprite_file_path(spriteNameValue);
+    if (!LittleFS.exists(spritePath)) {
+      error = "Sprite file not found for state " + String(kPetStates[i]) + ": " + spritePath;
+      return false;
+    }
+  }
+  return true;
+}
+
+void apply_pet_pack(JsonObjectConst root) {
+  activePetPackId = root["petId"].as<const char *>();
+  activePetPackDisplayName = root["displayName"].as<const char *>();
+  activePetPackSourceHash = root["sourceHash"].as<const char *>();
+  activePetPackSpriteVersion = static_cast<uint8_t>(root["spriteVersion"].as<int>());
+  JsonObjectConst sprites = root["sprites"].as<JsonObjectConst>();
+  for (size_t i = 0; i < kPetStateCount; ++i) {
+    activePetPackSprites[i] = sprites[kPetStates[i]].as<const char *>();
+  }
+}
+
+bool persist_pet_pack(const String &json, String &error) {
+  LittleFS.remove(kPetPackUploadPath);
+  File upload = LittleFS.open(kPetPackUploadPath, FILE_WRITE);
+  if (!upload) {
+    error = "Could not create pet-pack manifest";
+    return false;
+  }
+  const size_t written = upload.print(json);
+  upload.close();
+  if (written != json.length()) {
+    LittleFS.remove(kPetPackUploadPath);
+    error = "Could not write pet-pack manifest";
+    return false;
+  }
+
+  LittleFS.remove(kPetPackBackupPath);
+  const bool hadCurrent = LittleFS.exists(kPetPackPath);
+  if (hadCurrent && !LittleFS.rename(kPetPackPath, kPetPackBackupPath)) {
+    LittleFS.remove(kPetPackUploadPath);
+    error = "Could not stage current pet-pack manifest";
+    return false;
+  }
+  if (!LittleFS.rename(kPetPackUploadPath, kPetPackPath)) {
+    if (hadCurrent) {
+      LittleFS.rename(kPetPackBackupPath, kPetPackPath);
+    }
+    LittleFS.remove(kPetPackUploadPath);
+    error = "Could not activate pet-pack manifest";
+    return false;
+  }
+  LittleFS.remove(kPetPackBackupPath);
+  return true;
+}
+
+void load_pet_pack() {
+  clear_active_pet_pack();
+  if (!LittleFS.exists(kPetPackPath) && LittleFS.exists(kPetPackBackupPath)) {
+    LittleFS.rename(kPetPackBackupPath, kPetPackPath);
+  }
+  File file = LittleFS.open(kPetPackPath, FILE_READ);
+  if (!file) {
+    return;
+  }
+  JsonDocument doc;
+  const DeserializationError jsonError = deserializeJson(doc, file);
+  file.close();
+  String error;
+  if (jsonError || !validate_pet_pack(doc.as<JsonObjectConst>(), error)) {
+    Serial.printf("Ignoring invalid pet-pack manifest: %s\n", jsonError ? jsonError.c_str() : error.c_str());
+    return;
+  }
+  apply_pet_pack(doc.as<JsonObjectConst>());
+  Serial.printf("Loaded pet pack: %s (%s)\n", activePetPackDisplayName.c_str(), activePetPackId.c_str());
 }
 
 bool file_has_gif_header(const char *path) {
@@ -387,6 +569,13 @@ bool delete_sprite(const String &name, String &error) {
     return false;
   }
 
+  for (size_t i = 0; i < kPetStateCount; ++i) {
+    if (activePetPackSprites[i] == name) {
+      error = "Sprite belongs to the active pet pack";
+      return false;
+    }
+  }
+
   const String filePath = sprite_file_path(name);
   if (!LittleFS.exists(filePath)) {
     error = "Sprite not found";
@@ -427,9 +616,15 @@ bool show_pet_sprite(const String &name, unsigned long ttlMs, String &error) {
     return false;
   }
 
+  const String resolvedName = resolve_sprite_name(name);
+  if (!is_valid_sprite_name(resolvedName)) {
+    error = "Invalid sprite mapping";
+    return false;
+  }
+
   defaultSpriteLoadPending = false;
 
-  const String filePath = sprite_file_path(name);
+  const String filePath = sprite_file_path(resolvedName);
   if (!LittleFS.exists(filePath)) {
     error = "Sprite not found";
     return false;
@@ -439,12 +634,12 @@ bool show_pet_sprite(const String &name, unsigned long ttlMs, String &error) {
   uint16_t width = 0;
   uint16_t height = 0;
   const size_t fileSize = LittleFS.open(filePath, FILE_READ).size();
-  const String lvglPath = sprite_lvgl_path(name);
+  const String lvglPath = sprite_lvgl_path(resolvedName);
   lv_gif_get_size(lvglPath.c_str(), &width, &height);
   Serial.printf(
       "%s sprite %s: path=%s size=%u dims=%ux%u internal=%u largest_internal=%u psram=%u largest_psram=%u\n",
       ui_is_pet_page_active() ? "Loading" : "Queued",
-      name.c_str(),
+      resolvedName.c_str(),
       lvglPath.c_str(),
       static_cast<unsigned>(fileSize),
       width,
@@ -454,11 +649,11 @@ bool show_pet_sprite(const String &name, unsigned long ttlMs, String &error) {
       ESP.getFreePsram(),
       heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
 
-  if (!ui_show_pet_sprite(name.c_str(), lvglPath.c_str())) {
+  if (!ui_show_pet_sprite(resolvedName.c_str(), lvglPath.c_str())) {
     error = "Sprite failed to load";
     Serial.printf(
         "Sprite load failed: %s internal=%u largest_internal=%u psram=%u largest_psram=%u\n",
-        name.c_str(),
+        resolvedName.c_str(),
         heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
         heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
         ESP.getFreePsram(),
@@ -468,7 +663,9 @@ bool show_pet_sprite(const String &name, unsigned long ttlMs, String &error) {
   debug_log_heap("sprite-show-after-ui");
 
   if (ttlMs > 0) {
-    temporarySpritePreviousName = activeSpriteName;
+    temporarySpritePreviousName = pet_state_index(name) >= 0
+        ? resolve_sprite_name(kDefaultSpriteName)
+        : activeSpriteName;
     petSpriteExpiresAtMs = millis() + ttlMs;
     petSpriteExpires = true;
   } else {
@@ -476,7 +673,7 @@ bool show_pet_sprite(const String &name, unsigned long ttlMs, String &error) {
     petSpriteExpires = false;
   }
 
-  activeSpriteName = name;
+  activeSpriteName = resolvedName;
   return true;
 }
 
@@ -513,6 +710,8 @@ bool init_sprite_storage() {
   }
 
   seed_default_pet_sprites();
+  remove_legacy_pet_sprites();
+  load_pet_pack();
 
   Serial.printf(
       "LittleFS mounted: used=%u total=%u\n",
@@ -978,6 +1177,53 @@ void handlePetCommand() {
   server.send(200, "text/plain", "Showing sprite: " + String(name));
 }
 
+void handlePetPackGet() {
+  JsonDocument doc;
+  doc["petId"] = activePetPackId;
+  doc["displayName"] = activePetPackDisplayName;
+  doc["sourceHash"] = activePetPackSourceHash;
+  doc["spriteVersion"] = activePetPackSpriteVersion;
+  JsonObject sprites = doc["sprites"].to<JsonObject>();
+  for (size_t i = 0; i < kPetStateCount; ++i) {
+    if (activePetPackSprites[i].length() > 0) {
+      sprites[kPetStates[i]] = activePetPackSprites[i];
+    }
+  }
+  String response;
+  serializeJson(doc, response);
+  server.send(200, "application/json", response);
+}
+
+void handlePetPackPost() {
+  if (!spriteStorageReady) {
+    server.send(503, "text/plain", "Sprite storage unavailable");
+    return;
+  }
+  JsonDocument doc;
+  const DeserializationError jsonError = deserializeJson(doc, server.arg("plain"));
+  if (jsonError) {
+    server.send(400, "text/plain", "Invalid JSON");
+    return;
+  }
+  String error;
+  const JsonObjectConst root = doc.as<JsonObjectConst>();
+  if (!validate_pet_pack(root, error)) {
+    server.send(400, "text/plain", error);
+    return;
+  }
+  String manifest;
+  serializeJson(doc, manifest);
+  if (!persist_pet_pack(manifest, error)) {
+    server.send(500, "text/plain", error);
+    return;
+  }
+  apply_pet_pack(root);
+  temporarySpritePreviousName = "";
+  petSpriteExpires = false;
+  show_default_pet_sprite();
+  server.send(200, "text/plain", "Activated pet pack: " + activePetPackDisplayName);
+}
+
 void handlePetMessageCommand() {
   JsonDocument doc;
   DeserializationError jsonError = deserializeJson(doc, server.arg("plain"));
@@ -1173,6 +1419,8 @@ void wifi_config_init() {
   server.on("/sprites", HTTP_DELETE, handleSpriteDelete);
   server.on("/sprites/upload", HTTP_POST, handleSpriteUploadComplete, handleSpriteUploadData);
   server.on("/pet", HTTP_POST, handlePetCommand);
+  server.on("/pet-pack", HTTP_GET, handlePetPackGet);
+  server.on("/pet-pack", HTTP_POST, handlePetPackPost);
   server.on("/pet/message", HTTP_POST, handlePetMessageCommand);
   server.on("/connect", HTTP_POST, handleConnect);
   server.on("/forget", HTTP_POST, handleForget);

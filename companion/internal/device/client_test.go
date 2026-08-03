@@ -3,6 +3,7 @@ package device
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -45,6 +46,50 @@ func TestClientWritesDevicePayloads(t *testing.T) {
 	}
 	if received["/pet"]["ttlMs"] != float64(1500) {
 		t.Fatalf("unexpected pet payload: %#v", received["/pet"])
+	}
+}
+
+func TestPetPackUploadAndActivation(t *testing.T) {
+	var uploadedName string
+	var uploadedBody []byte
+	var activated PetPack
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/sprites/upload":
+			uploadedName = r.URL.Query().Get("name")
+			if err := r.ParseMultipartForm(1024); err != nil {
+				t.Errorf("parse upload: %v", err)
+				return
+			}
+			file, _, err := r.FormFile("file")
+			if err != nil {
+				t.Errorf("read upload: %v", err)
+				return
+			}
+			defer file.Close()
+			uploadedBody, _ = io.ReadAll(file)
+		case r.URL.Path == "/pet-pack" && r.Method == http.MethodPost:
+			if err := json.NewDecoder(r.Body).Decode(&activated); err != nil {
+				t.Errorf("decode pet pack: %v", err)
+			}
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client, _ := New(server.URL, time.Second)
+	if err := client.UploadSprite(context.Background(), "pet-abc-idle", []byte("GIF89a")); err != nil {
+		t.Fatal(err)
+	}
+	pack := PetPack{PetID: "codex", DisplayName: "Codex", SourceHash: "abc", SpriteVersion: 2, Sprites: map[string]string{"idle": "pet-abc-idle"}}
+	if err := client.ActivatePetPack(context.Background(), pack); err != nil {
+		t.Fatal(err)
+	}
+	if uploadedName != "pet-abc-idle" || string(uploadedBody) != "GIF89a" {
+		t.Fatalf("unexpected upload name=%q body=%q", uploadedName, uploadedBody)
+	}
+	if activated.PetID != "codex" || activated.Sprites["idle"] != "pet-abc-idle" {
+		t.Fatalf("unexpected activated pack: %#v", activated)
 	}
 }
 
