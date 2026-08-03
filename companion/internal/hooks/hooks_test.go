@@ -28,9 +28,10 @@ func TestActionForMapsEveryManagedEvent(t *testing.T) {
 		pet     string
 		message string
 		muted   bool
+		clear   bool
 	}{
 		{name: "session start", event: Event{Name: "SessionStart"}, pet: "waving", message: "Codex is ready", muted: true},
-		{name: "prompt", event: Event{Name: "UserPromptSubmit"}, pet: "running", message: "Codex is working"},
+		{name: "prompt", event: Event{Name: "UserPromptSubmit"}, pet: "running", message: "Thinking...", muted: true},
 		{name: "approval", event: Event{Name: "PermissionRequest"}, pet: "waiting", message: "Approval needed"},
 		{name: "tool result", event: Event{Name: "PostToolUse", ToolResponse: json.RawMessage(`{"exit_code":0}`)}, message: "Tool finished", muted: true},
 		{name: "tool failure", event: Event{Name: "PostToolUse", ToolResponse: json.RawMessage(`{"exit_code":2}`)}, pet: "failed", message: "Tool failed"},
@@ -38,7 +39,7 @@ func TestActionForMapsEveryManagedEvent(t *testing.T) {
 		{name: "post compact", event: Event{Name: "PostCompact"}, pet: "running", message: "Continuing with compacted context", muted: true},
 		{name: "subagent start", event: Event{Name: "SubagentStart"}, pet: "running", message: "Subagent working", muted: true},
 		{name: "subagent stop", event: Event{Name: "SubagentStop"}, message: "Subagent finished", muted: true},
-		{name: "stop", event: Event{Name: "Stop"}, pet: "review", message: "Ready", muted: true},
+		{name: "stop", event: Event{Name: "Stop"}, pet: "review", clear: true},
 		{name: "session end", event: Event{Name: "SessionEnd"}, pet: "idle", message: "Session ended", muted: true},
 	}
 	for _, test := range tests {
@@ -47,7 +48,7 @@ func TestActionForMapsEveryManagedEvent(t *testing.T) {
 			if !ok {
 				t.Fatal("event did not produce an action")
 			}
-			if action.Pet != test.pet || action.Message != test.message || action.Muted != test.muted {
+			if action.Pet != test.pet || action.Message != test.message || action.Muted != test.muted || action.ClearMessage != test.clear {
 				t.Fatalf("unexpected action: %#v", action)
 			}
 		})

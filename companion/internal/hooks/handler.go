@@ -24,10 +24,11 @@ type Event struct {
 }
 
 type Action struct {
-	Pet     string
-	TTL     time.Duration
-	Message string
-	Muted   bool
+	Pet          string
+	TTL          time.Duration
+	Message      string
+	Muted        bool
+	ClearMessage bool
 }
 
 type Processor struct {
@@ -73,7 +74,7 @@ func ActionFor(event Event) (Action, bool) {
 		}
 		return Action{Pet: "waving", TTL: pet.BurstDuration("waving"), Message: "Codex is ready", Muted: true}, true
 	case "UserPromptSubmit":
-		return Action{Pet: "running", TTL: pet.BurstDuration("running"), Message: "Codex is working", Muted: false}, true
+		return Action{Pet: "running", TTL: pet.BurstDuration("running"), Message: "Thinking...", Muted: true}, true
 	case "PermissionRequest":
 		return Action{Pet: "waiting", TTL: pet.BurstDuration("waiting"), Message: "Approval needed", Muted: false}, true
 	case "PostToolUse":
@@ -90,7 +91,7 @@ func ActionFor(event Event) (Action, bool) {
 	case "SubagentStop":
 		return Action{Message: "Subagent finished", Muted: true}, true
 	case "Stop":
-		return Action{Pet: "review", TTL: pet.BurstDuration("review"), Message: "Ready", Muted: true}, true
+		return Action{Pet: "review", TTL: pet.BurstDuration("review"), ClearMessage: true}, true
 	case "SessionEnd":
 		return Action{Pet: "idle", Message: "Session ended", Muted: true}, true
 	default:
@@ -149,7 +150,7 @@ func (p Processor) Process(ctx context.Context, event Event) error {
 	if action.Pet != "" {
 		operations = append(operations, func() error { return p.Device.SetPet(ctx, action.Pet, action.TTL) })
 	}
-	if action.Message != "" {
+	if action.Message != "" || action.ClearMessage {
 		operations = append(operations, func() error { return p.Device.SetMessage(ctx, action.Message, action.Muted) })
 	}
 	if p.ContextEnabled && event.TranscriptPath != "" {
