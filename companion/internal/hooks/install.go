@@ -11,7 +11,21 @@ import (
 
 const managedStatusPrefix = "ESP32 Agent:"
 
-var installedEvents = []string{"SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"}
+// PreToolUse is intentionally omitted: UserPromptSubmit already establishes
+// the working state, so another blocking command before every tool adds no new
+// device signal. PostToolUse remains useful for review and failure states.
+var installedEvents = []string{
+	"SessionStart",
+	"UserPromptSubmit",
+	"PermissionRequest",
+	"PostToolUse",
+	"PreCompact",
+	"PostCompact",
+	"SubagentStart",
+	"SubagentStop",
+	"Stop",
+	"SessionEnd",
+}
 
 func ManagedEvents() []string {
 	return append([]string(nil), installedEvents...)

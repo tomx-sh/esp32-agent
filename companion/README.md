@@ -70,8 +70,8 @@ esp32-agent setup
 ```
 
 Setup configures the companion, tests the device, and then explicitly asks
-whether to add the four lifecycle commands to the displayed Codex hooks file.
-It ends with a summary of every path and change.
+whether to add the Codex lifecycle commands to the displayed hooks file. It
+ends with a summary of every path and change.
 
 To change settings later without modifying hooks, run:
 
@@ -97,12 +97,19 @@ esp32-agent hooks install
 esp32-agent run
 ```
 
-Open `/hooks` in Codex Desktop after installation and trust the four ESP32 Agent definitions. Existing hooks and unknown fields in `~/.codex/hooks.json` are preserved.
+Open `/hooks` in Codex Desktop after installation and trust the ESP32 Agent definitions. Existing hooks and unknown fields in `~/.codex/hooks.json` are preserved. The handlers observe lifecycle events only; they do not approve, deny, block, or rewrite Codex actions.
+
+The installer configures ten of Codex's eleven current lifecycle events.
+`PreToolUse` is intentionally omitted because `UserPromptSubmit` already puts
+the device in its working state; running another command before every tool
+would add latency without showing new information. Hook delivery is bounded to
+one second so an unavailable device cannot hold Codex for the normal HTTP
+timeout.
 
 ## Data sources
 
 - Quota remaining, reset time, and reset-credit count come from `account/rateLimits/read` on a short-lived `codex app-server` process. The companion converts Codex's raw used percentage at this adapter boundary so every downstream component uses the same remaining-percentage meaning.
-- GIF state and generic messages come from `SessionStart`, `UserPromptSubmit`, `Stop`, and `SessionEnd` hooks.
+- GIF state and generic messages come from session, prompt, tool-result, approval, compaction, subagent, and stop hooks. Attention states such as approval requests and detected tool failures use normal messages; routine progress messages are muted. A tool is marked failed only when its structured result exposes `isError`, `success: false`, or a non-zero exit code.
 - Context percentage comes from the most recent `token_count` record in the active transcript path supplied by Codex hooks.
 
 Context parsing is deliberately isolated. If Codex changes its internal JSONL format, the companion reports context as unavailable and does not overwrite the device with a false zero value. Quota and lifecycle features continue working independently.

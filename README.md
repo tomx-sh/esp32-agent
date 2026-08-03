@@ -54,10 +54,12 @@ esp32-agent run
 
 Setup saves the settings, tests the device, and explicitly asks before changing
 the global Codex hooks file. After installing hooks, open `/hooks` in Codex
-Desktop and trust the new definitions. The installer adds only `SessionStart`,
-`UserPromptSubmit`, `Stop`, and `SessionEnd`; it does not monitor tool calls or
-permission requests. Run `esp32-agent configure` when you only want to change
-settings; it never modifies hooks.
+Desktop and trust the new definitions. The installer adds lifecycle hooks for
+sessions, prompts, tool results, approvals, compaction, subagents, and turn
+completion. These drive semantic pet states and concise messages; they never
+approve, deny, block, or rewrite Codex actions. Run
+`esp32-agent configure` when you only want to change settings; it never modifies
+hooks.
 
 The foreground bridge polls Codex account limits through `codex app-server`, converts the reported usage to quota remaining, sends quota/reset information to the device, and follows the active transcript path supplied by hooks for context usage. The transcript parser is isolated and best-effort because Codex does not guarantee that file format; failures leave the last context value untouched.
 

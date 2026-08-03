@@ -190,7 +190,9 @@ func (a *application) hookCommand() *cobra.Command {
 				return err
 			}
 			processor := hooks.Processor{Device: client, StatePath: a.statePath, ContextEnabled: cfg.ContextEnabled}
-			if err := processor.Process(cmd.Context(), event); err != nil {
+			deliveryCtx, cancel := context.WithTimeout(cmd.Context(), time.Second)
+			defer cancel()
+			if err := processor.Process(deliveryCtx, event); err != nil {
 				if a.verbose {
 					a.logError(err)
 				}
@@ -481,7 +483,7 @@ func (a *application) reportConfigurationSaved() {
 		return
 	}
 	if installed {
-		fmt.Fprintf(a.out, "Hooks status: ESP32 Agent commands remain installed for %s.\n", managedEventsText())
+		fmt.Fprintf(a.out, "Hooks status: ESP32 Agent commands remain installed for %s.\n", managedEventsSummary())
 		return
 	}
 	fmt.Fprintln(a.out, "Hooks status: ESP32 Agent commands are not installed.")
@@ -489,8 +491,13 @@ func (a *application) reportConfigurationSaved() {
 }
 
 func (a *application) reportHooksInstalled(path string) {
-	fmt.Fprintf(a.out, "Added ESP32 Agent commands for %s to %s.\n", managedEventsText(), path)
+	fmt.Fprintf(a.out, "Added ESP32 Agent commands for %s to %s.\n", managedEventsSummary(), path)
+	fmt.Fprintf(a.out, "Events: %s.\n", managedEventsText())
 	fmt.Fprintln(a.out, "Next: open /hooks in Codex Desktop and review/trust the new definitions.")
+}
+
+func managedEventsSummary() string {
+	return fmt.Sprintf("%d Codex lifecycle events", len(hooks.ManagedEvents()))
 }
 
 func managedEventsText() string {

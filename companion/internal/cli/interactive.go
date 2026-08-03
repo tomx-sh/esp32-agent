@@ -201,7 +201,7 @@ func (a *application) runSetup(ctx context.Context, hooksPath string) error {
 		huh.NewGroup(
 			huh.NewConfirm().
 				Title("Install Codex Desktop hooks?").
-				Description(fmt.Sprintf("Adds %s commands to %s.", managedEventsText(), hooksPath)).
+				Description(fmt.Sprintf("Adds commands for %s to %s.", managedEventsSummary(), hooksPath)).
 				Affirmative("Install").
 				Negative("Skip").
 				Value(&install),
@@ -221,7 +221,7 @@ func (a *application) runSetup(ctx context.Context, hooksPath string) error {
 	fmt.Fprintln(a.out, "  Device:        connected")
 	fmt.Fprintf(a.out, "  Hooks file:    %s\n", hooksPath)
 	if install {
-		fmt.Fprintf(a.out, "  Hooks:         added commands for %s\n", managedEventsText())
+		fmt.Fprintf(a.out, "  Hooks:         added commands for %s\n", managedEventsSummary())
 		fmt.Fprintln(a.out, "Next: open /hooks in Codex Desktop and review/trust the new definitions.")
 	} else {
 		fmt.Fprintln(a.out, "  Hooks:         not installed (skipped)")

@@ -119,7 +119,7 @@ func TestSetupConfiguresTestsAndInstallsHooks(t *testing.T) {
 		"Device connected",
 		"Setup complete",
 		"Hooks file:    " + hooksPath,
-		"added commands for SessionStart, UserPromptSubmit, Stop, SessionEnd",
+		"added commands for 10 Codex lifecycle events",
 		"open /hooks in Codex Desktop",
 	} {
 		if !strings.Contains(out.String(), expected) {
@@ -150,7 +150,7 @@ func TestStatusShowsHooksFileAndInstallationState(t *testing.T) {
 	if err := command.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "Hooks file:    "+hooksPath) || !strings.Contains(out.String(), "Hooks:         installed (4 lifecycle commands)") {
+	if !strings.Contains(out.String(), "Hooks file:    "+hooksPath) || !strings.Contains(out.String(), "Hooks:         installed (10 lifecycle commands)") {
 		t.Fatalf("status does not show installed hooks:\n%s", out.String())
 	}
 }
@@ -169,7 +169,8 @@ func TestHooksInstallExplainsChanges(t *testing.T) {
 	if err := command.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "Added ESP32 Agent commands for SessionStart, UserPromptSubmit, Stop, SessionEnd to "+hooksPath) {
+	if !strings.Contains(out.String(), "Added ESP32 Agent commands for 10 Codex lifecycle events to "+hooksPath) ||
+		!strings.Contains(out.String(), "Events: SessionStart, UserPromptSubmit, PermissionRequest, PostToolUse, PreCompact, PostCompact, SubagentStart, SubagentStop, Stop, SessionEnd.") {
 		t.Fatalf("hooks install does not explain its changes:\n%s", out.String())
 	}
 }

@@ -9,12 +9,73 @@ import (
 )
 
 func TestDecodeEventSupportsDocumentedFields(t *testing.T) {
-	event, err := DecodeEvent(strings.NewReader(`{"hook_event_name":"Stop","session_id":"session-1","transcript_path":"/tmp/session.jsonl"}`))
+	event, err := DecodeEvent(strings.NewReader(`{"hook_event_name":"PostToolUse","session_id":"session-1","transcript_path":"/tmp/session.jsonl","source":"compact","tool_response":{"exit_code":1}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if event.Name != "Stop" || event.SessionID != "session-1" || event.TranscriptPath != "/tmp/session.jsonl" {
+	if event.Name != "PostToolUse" || event.SessionID != "session-1" || event.TranscriptPath != "/tmp/session.jsonl" || event.Source != "compact" {
 		t.Fatalf("unexpected event: %#v", event)
+	}
+	if !toolFailed(event.ToolResponse) {
+		t.Fatal("documented tool_response was not retained")
+	}
+}
+
+func TestActionForMapsEveryManagedEvent(t *testing.T) {
+	tests := []struct {
+		name    string
+		event   Event
+		pet     string
+		message string
+		muted   bool
+	}{
+		{name: "session start", event: Event{Name: "SessionStart"}, pet: "codex-waving", message: "Codex is ready", muted: true},
+		{name: "prompt", event: Event{Name: "UserPromptSubmit"}, pet: "codex-thinking", message: "Codex is working"},
+		{name: "approval", event: Event{Name: "PermissionRequest"}, pet: "codex-waiting", message: "Approval needed"},
+		{name: "tool result", event: Event{Name: "PostToolUse", ToolResponse: json.RawMessage(`{"exit_code":0}`)}, pet: "codex-review", message: "Reviewing tool result", muted: true},
+		{name: "tool failure", event: Event{Name: "PostToolUse", ToolResponse: json.RawMessage(`{"exit_code":2}`)}, pet: "codex-failed", message: "Tool failed"},
+		{name: "pre compact", event: Event{Name: "PreCompact"}, pet: "codex-review", message: "Compacting context", muted: true},
+		{name: "post compact", event: Event{Name: "PostCompact"}, pet: "codex-thinking", message: "Continuing with compacted context", muted: true},
+		{name: "subagent start", event: Event{Name: "SubagentStart"}, pet: "codex-thinking", message: "Subagent working", muted: true},
+		{name: "subagent stop", event: Event{Name: "SubagentStop"}, pet: "codex-review", message: "Reviewing subagent result", muted: true},
+		{name: "stop", event: Event{Name: "Stop"}, pet: "codex-idle", message: "Ready", muted: true},
+		{name: "session end", event: Event{Name: "SessionEnd"}, pet: "codex-idle", message: "Session ended", muted: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			action, ok := ActionFor(test.event)
+			if !ok {
+				t.Fatal("event did not produce an action")
+			}
+			if action.Pet != test.pet || action.Message != test.message || action.Muted != test.muted {
+				t.Fatalf("unexpected action: %#v", action)
+			}
+		})
+	}
+}
+
+func TestActionForIgnoresCompactSessionRestart(t *testing.T) {
+	if _, ok := ActionFor(Event{Name: "SessionStart", Source: "compact"}); ok {
+		t.Fatal("compact session restart should not overwrite PostCompact state")
+	}
+}
+
+func TestToolFailedUsesOnlyStructuredTopLevelSignals(t *testing.T) {
+	tests := []struct {
+		response string
+		failed   bool
+	}{
+		{response: `{"isError":true}`, failed: true},
+		{response: `{"success":false}`, failed: true},
+		{response: `{"exitCode":1}`, failed: true},
+		{response: `{"exit_code":0}`},
+		{response: `{"output":"error: this is only text"}`},
+		{response: `"command failed"`},
+	}
+	for _, test := range tests {
+		if got := toolFailed(json.RawMessage(test.response)); got != test.failed {
+			t.Fatalf("toolFailed(%s) = %t, want %t", test.response, got, test.failed)
+		}
 	}
 }
 
