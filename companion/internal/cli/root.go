@@ -264,9 +264,13 @@ func (a *application) deviceCommand() *cobra.Command {
 	}
 	pet.Flags().DurationVar(&ttl, "ttl", 0, "restore the previous sprite after this duration")
 	cmd.AddCommand(pet)
-	var muted bool
 	message := &cobra.Command{
-		Use:   "message TEXT",
+		Use:   "message",
+		Short: "Control the generic Codex message",
+	}
+	var muted bool
+	setMessage := &cobra.Command{
+		Use:   "set TEXT",
 		Short: "Set the generic Codex message",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(ctxCmd *cobra.Command, args []string) error {
@@ -277,7 +281,20 @@ func (a *application) deviceCommand() *cobra.Command {
 			return client.SetMessage(ctxCmd.Context(), strings.Join(args, " "), muted)
 		},
 	}
-	message.Flags().BoolVar(&muted, "muted", false, "render the message in the muted style")
+	setMessage.Flags().BoolVar(&muted, "muted", false, "render the message in the muted style")
+	message.AddCommand(setMessage)
+	message.AddCommand(&cobra.Command{
+		Use:   "clear",
+		Short: "Clear the generic Codex message",
+		Args:  cobra.NoArgs,
+		RunE: func(ctxCmd *cobra.Command, _ []string) error {
+			_, client, err := a.loadClient()
+			if err != nil {
+				return err
+			}
+			return client.SetMessage(ctxCmd.Context(), "", false)
+		},
+	})
 	cmd.AddCommand(message)
 	return cmd
 }

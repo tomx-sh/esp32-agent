@@ -81,7 +81,7 @@ func ActionFor(event Event) (Action, bool) {
 		if toolFailed(event.ToolResponse) {
 			return Action{Pet: "failed", TTL: pet.BurstDuration("failed"), Message: "Tool failed", Muted: false}, true
 		}
-		return Action{Message: "Tool finished", Muted: true}, true
+		return Action{ClearMessage: true}, true
 	case "PreCompact":
 		return Action{Message: "Compacting context", Muted: true}, true
 	case "PostCompact":

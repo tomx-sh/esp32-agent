@@ -58,7 +58,8 @@ esp32-agent status          Show configuration and live device state
 esp32-agent hooks install   Merge global lifecycle hooks into ~/.codex/hooks.json
 esp32-agent hooks uninstall Remove only ESP32 Agent hook handlers
 esp32-agent device pet      Show a bundled sprite
-esp32-agent device message  Set the generic Codex message
+esp32-agent device message set TEXT  Set the generic Codex message
+esp32-agent device message clear     Clear the generic Codex message
 esp32-agent completion      Generate shell completion instructions
 ```
 

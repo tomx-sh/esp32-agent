@@ -175,6 +175,54 @@ func TestHooksInstallExplainsChanges(t *testing.T) {
 	}
 }
 
+func TestDeviceMessageSetAndClear(t *testing.T) {
+	type message struct {
+		Message string `json:"message"`
+		Muted   bool   `json:"muted"`
+	}
+	received := make(chan message, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/codex/message" {
+			http.NotFound(response, request)
+			return
+		}
+		var payload message
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Errorf("decode message: %v", err)
+			response.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		received <- payload
+		response.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cfg := config.Default()
+	cfg.DeviceURL = server.URL
+	if err := config.Save(configPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	run := func(args ...string) {
+		t.Helper()
+		command := New(Options{In: strings.NewReader(""), Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}, Version: "test"})
+		command.SetArgs(append([]string{"--config", configPath, "device", "message"}, args...))
+		if err := command.Execute(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run("set", "Thinking...", "still", "--muted")
+	run("clear")
+
+	if got := <-received; got.Message != "Thinking... still" || !got.Muted {
+		t.Fatalf("unexpected set payload: %#v", got)
+	}
+	if got := <-received; got.Message != "" || got.Muted {
+		t.Fatalf("unexpected clear payload: %#v", got)
+	}
+}
+
 func newDeviceServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {

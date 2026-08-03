@@ -33,7 +33,7 @@ func TestActionForMapsEveryManagedEvent(t *testing.T) {
 		{name: "session start", event: Event{Name: "SessionStart"}, pet: "waving", message: "Codex is ready", muted: true},
 		{name: "prompt", event: Event{Name: "UserPromptSubmit"}, pet: "running", message: "Thinking...", muted: true},
 		{name: "approval", event: Event{Name: "PermissionRequest"}, pet: "waiting", message: "Approval needed"},
-		{name: "tool result", event: Event{Name: "PostToolUse", ToolResponse: json.RawMessage(`{"exit_code":0}`)}, message: "Tool finished", muted: true},
+		{name: "tool result", event: Event{Name: "PostToolUse", ToolResponse: json.RawMessage(`{"exit_code":0}`)}, clear: true},
 		{name: "tool failure", event: Event{Name: "PostToolUse", ToolResponse: json.RawMessage(`{"exit_code":2}`)}, pet: "failed", message: "Tool failed"},
 		{name: "pre compact", event: Event{Name: "PreCompact"}, message: "Compacting context", muted: true},
 		{name: "post compact", event: Event{Name: "PostCompact"}, pet: "running", message: "Continuing with compacted context", muted: true},
