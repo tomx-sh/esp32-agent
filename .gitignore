@@ -1,2 +1,2 @@
-.pio
-include/generated/
+firmware/.pio/
+firmware/include/generated/

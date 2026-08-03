@@ -46,9 +46,10 @@ Failed to connect to ESP32-S3: Serial data stream stopped: Possible serial noise
 
 ## Flash Workflow
 
-Build and upload to the explicit USB-Serial/JTAG port:
+Enter the PlatformIO project directory, then build and upload to the explicit USB-Serial/JTAG port:
 
 ```sh
+cd firmware
 pio run -e esp32-s3-devkitc-1 -t upload --upload-port /dev/cu.usbmodemXXXX
 ```
 
@@ -73,5 +74,5 @@ Successful completion includes hash verification and `SUCCESS`.
 
 ## Notes
 
-- This project has `ARDUINO_USB_MODE=1` and `ARDUINO_USB_CDC_ON_BOOT=1` in `platformio.ini`; those flags affect firmware USB behavior but do not make the `BIGMEUNT VCPHID` runtime port a reliable esptool flashing target.
+- This project has `ARDUINO_USB_MODE=1` and `ARDUINO_USB_CDC_ON_BOOT=1` in `firmware/platformio.ini`; those flags affect firmware USB behavior but do not make the `BIGMEUNT VCPHID` runtime port a reliable esptool flashing target.
 - After this firmware is flashed once and connected to Wi-Fi, prefer the `esp32-ota-flash` skill for OTA updates.
