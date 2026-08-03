@@ -14,7 +14,19 @@ Requirements:
 go install ./cmd/esp32-agent
 ```
 
-Ensure the Go binary directory is on `PATH`. It is usually `$(go env GOPATH)/bin`.
+Go installs the executable in `$(go env GOPATH)/bin`. Add that directory to your
+shell `PATH` once; for zsh:
+
+```sh
+echo 'export PATH="$HOME/go/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Then verify the installation:
+
+```sh
+esp32-agent --version
+```
 
 ## Guided mode
 
