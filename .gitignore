@@ -1,2 +1,3 @@
 firmware/.pio/
 firmware/include/generated/
+companion/esp32-agent
