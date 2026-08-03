@@ -1,0 +1,214 @@
+package cli
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+
+	"charm.land/huh/v2"
+	"github.com/charmbracelet/x/term"
+	"github.com/tomx-sh/esp32-agent/companion/internal/config"
+	"github.com/tomx-sh/esp32-agent/companion/internal/hooks"
+)
+
+type interactiveAction string
+
+const (
+	actionConfigure interactiveAction = "configure"
+	actionTest      interactiveAction = "test"
+	actionSync      interactiveAction = "sync"
+	actionRun       interactiveAction = "run"
+	actionHooks     interactiveAction = "hooks"
+	actionStatus    interactiveAction = "status"
+	actionExit      interactiveAction = "exit"
+)
+
+func (a *application) interactive(ctx context.Context) error {
+	for {
+		action, err := a.promptAction(ctx)
+		if promptCanceled(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		switch action {
+		case actionConfigure:
+			cfg, err := config.Load(a.configPath)
+			if err == nil {
+				err = a.promptConfiguration(ctx, cfg)
+			}
+			if err != nil && !promptCanceled(err) {
+				a.logError(err)
+			}
+		case actionTest:
+			if err := a.showDevice(ctx); err != nil {
+				a.logError(err)
+			}
+		case actionSync:
+			cfg, client, err := a.loadClient()
+			if err == nil {
+				err = a.syncAll(ctx, cfg, client)
+			}
+			if err != nil {
+				a.logError(err)
+			}
+		case actionRun:
+			return a.runBridge(ctx)
+		case actionHooks:
+			path, err := hooks.DefaultConfigPath()
+			if err == nil {
+				err = a.installHooks(path)
+			}
+			if err != nil {
+				a.logError(err)
+			} else {
+				fmt.Fprintln(a.out, "Hooks installed. Review and trust them from /hooks in Codex.")
+			}
+		case actionStatus:
+			if err := a.showStatus(ctx); err != nil {
+				a.logError(err)
+			}
+		case actionExit:
+			return nil
+		}
+	}
+}
+
+func (a *application) promptAction(ctx context.Context) (interactiveAction, error) {
+	var action interactiveAction
+	err := a.runPromptForm(ctx,
+		huh.NewGroup(
+			huh.NewSelect[interactiveAction]().
+				Title("ESP32 Agent Companion").
+				Description("Connect Codex Desktop activity and usage to your device.").
+				Options(
+					huh.NewOption("Configure companion", actionConfigure),
+					huh.NewOption("Test device connection", actionTest),
+					huh.NewOption("Sync Codex data now", actionSync),
+					huh.NewOption("Run foreground bridge", actionRun),
+					huh.NewOption("Install Codex Desktop hooks", actionHooks),
+					huh.NewOption("Show status", actionStatus),
+					huh.NewOption("Exit", actionExit),
+				).
+				Value(&action),
+		),
+	)
+	if err != nil {
+		return "", err
+	}
+	return action, nil
+}
+
+func (a *application) promptConfiguration(ctx context.Context, cfg config.Config) error {
+	err := a.runPromptForm(ctx,
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Device URL").
+				Description("Base URL advertised by the ESP32 Agent.").
+				Value(&cfg.DeviceURL).
+				Validate(func(value string) error {
+					candidate := cfg
+					candidate.DeviceURL = strings.TrimSpace(value)
+					return candidate.Validate()
+				}),
+			huh.NewInput().
+				Title("Quota poll interval").
+				Description("Go duration of at least 10s, for example 5m.").
+				Value(&cfg.PollInterval).
+				Validate(func(value string) error {
+					candidate := cfg
+					candidate.PollInterval = strings.TrimSpace(value)
+					_, err := candidate.PollDuration()
+					return err
+				}),
+			huh.NewInput().
+				Title("Codex executable").
+				Description("Command or absolute path used to start Codex App Server.").
+				Value(&cfg.CodexPath).
+				Validate(func(value string) error {
+					if strings.TrimSpace(value) == "" {
+						return errors.New("Codex executable cannot be empty")
+					}
+					return nil
+				}),
+			huh.NewConfirm().
+				Title("Enable the experimental context gauge?").
+				Description("Reads the active Codex transcript using an isolated best-effort parser.").
+				Affirmative("Yes").
+				Negative("No").
+				Value(&cfg.ContextEnabled),
+		).
+			Title("Configure companion").
+			Description("Review the current values and save when finished."),
+	)
+	if err != nil {
+		return err
+	}
+
+	cfg.DeviceURL = strings.TrimSpace(cfg.DeviceURL)
+	cfg.PollInterval = strings.TrimSpace(cfg.PollInterval)
+	cfg.CodexPath = strings.TrimSpace(cfg.CodexPath)
+	if err := config.Save(a.configPath, cfg); err != nil {
+		return err
+	}
+	fmt.Fprintf(a.out, "Configuration saved to %s\n", a.configPath)
+	return nil
+}
+
+func (a *application) runPromptForm(ctx context.Context, groups ...*huh.Group) error {
+	accessible := os.Getenv("ACCESSIBLE") != "" || !isTerminal(a.in) || !isTerminal(a.out)
+	input := a.in
+	var trackedInput *singleByteReader
+	if accessible {
+		// Huh's accessible fields create a scanner per prompt. Limiting reads to
+		// one byte prevents buffered readers used by tests and pipelines from
+		// consuming answers intended for later fields.
+		trackedInput = &singleByteReader{reader: input}
+		input = trackedInput
+	}
+	err := huh.NewForm(groups...).
+		WithInput(input).
+		WithOutput(a.out).
+		WithAccessible(accessible).
+		RunWithContext(ctx)
+	if err == nil && trackedInput != nil && trackedInput.emptyEOF() {
+		return io.EOF
+	}
+	return err
+}
+
+func isTerminal(value any) bool {
+	file, ok := value.(*os.File)
+	return ok && term.IsTerminal(file.Fd())
+}
+
+type singleByteReader struct {
+	reader     io.Reader
+	bytesRead  int
+	reachedEOF bool
+}
+
+func (r *singleByteReader) Read(buffer []byte) (int, error) {
+	if len(buffer) == 0 {
+		return 0, nil
+	}
+	count, err := r.reader.Read(buffer[:1])
+	r.bytesRead += count
+	if errors.Is(err, io.EOF) {
+		r.reachedEOF = true
+	}
+	return count, err
+}
+
+func (r *singleByteReader) emptyEOF() bool {
+	return r.bytesRead == 0 && r.reachedEOF
+}
+
+func promptCanceled(err error) bool {
+	return errors.Is(err, huh.ErrUserAborted) || errors.Is(err, context.Canceled) || errors.Is(err, io.EOF)
+}

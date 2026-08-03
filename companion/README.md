@@ -6,7 +6,7 @@
 
 Requirements:
 
-- Go 1.24 or newer
+- Go 1.25.8 or newer
 - The `codex` CLI installed and signed in
 - The ESP32 Agent on the same network
 
@@ -30,13 +30,16 @@ esp32-agent --version
 
 ## Guided mode
 
-Running the tool without a command opens a numbered guide for the primary operations:
+Running the tool without a command opens a styled interactive guide for the primary operations:
 
 ```sh
 esp32-agent
 ```
 
-The guide can configure the device, test connectivity, sync once, start the bridge, install hooks, and show status.
+Use the arrow keys and Enter to choose an operation; Ctrl-C exits. The guide can
+configure the device, test connectivity, sync once, start the bridge, install
+hooks, and show status. It automatically falls back to simple numbered prompts
+when a terminal UI is unavailable or `ACCESSIBLE` is set.
 
 ## Commands
 

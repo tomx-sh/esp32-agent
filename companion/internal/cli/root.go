@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -28,7 +27,7 @@ type Options struct {
 }
 
 type application struct {
-	in         *bufio.Reader
+	in         io.Reader
 	out        io.Writer
 	errOut     io.Writer
 	version    string
@@ -41,7 +40,7 @@ func New(options Options) *cobra.Command {
 	configPath, _ := config.DefaultPath()
 	statePath, _ := state.DefaultPath()
 	app := &application{
-		in:         bufio.NewReader(options.In),
+		in:         options.In,
 		out:        options.Out,
 		errOut:     options.ErrOut,
 		version:    options.Version,
@@ -88,7 +87,7 @@ func (a *application) configureCommand() *cobra.Command {
 			}
 			changed := cmd.Flags().Changed("device-url") || cmd.Flags().Changed("poll-interval") || cmd.Flags().Changed("codex") || cmd.Flags().Changed("context")
 			if !changed {
-				return a.promptConfiguration(cfg)
+				return a.promptConfiguration(cmd.Context(), cfg)
 			}
 			if cmd.Flags().Changed("device-url") {
 				cfg.DeviceURL = strings.TrimSpace(deviceURL)
@@ -259,118 +258,6 @@ func (a *application) deviceCommand() *cobra.Command {
 	message.Flags().BoolVar(&muted, "muted", false, "render the message in the muted style")
 	cmd.AddCommand(message)
 	return cmd
-}
-
-func (a *application) interactive(ctx context.Context) error {
-	for {
-		fmt.Fprintln(a.out, "\nESP32 Agent Companion")
-		fmt.Fprintln(a.out, "  1. Configure")
-		fmt.Fprintln(a.out, "  2. Test device connection")
-		fmt.Fprintln(a.out, "  3. Sync Codex data now")
-		fmt.Fprintln(a.out, "  4. Run foreground bridge")
-		fmt.Fprintln(a.out, "  5. Install Codex Desktop hooks")
-		fmt.Fprintln(a.out, "  6. Show status")
-		fmt.Fprintln(a.out, "  7. Exit")
-		choice, err := a.readLine("Choose an operation", "7")
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		switch choice {
-		case "1":
-			cfg, err := config.Load(a.configPath)
-			if err == nil {
-				err = a.promptConfiguration(cfg)
-			}
-			if err != nil {
-				a.logError(err)
-			}
-		case "2":
-			if err := a.showDevice(ctx); err != nil {
-				a.logError(err)
-			}
-		case "3":
-			cfg, client, err := a.loadClient()
-			if err == nil {
-				err = a.syncAll(ctx, cfg, client)
-			}
-			if err != nil {
-				a.logError(err)
-			}
-		case "4":
-			return a.runBridge(ctx)
-		case "5":
-			path, err := hooks.DefaultConfigPath()
-			if err == nil {
-				err = a.installHooks(path)
-			}
-			if err != nil {
-				a.logError(err)
-			} else {
-				fmt.Fprintln(a.out, "Hooks installed. Review and trust them from /hooks in Codex.")
-			}
-		case "6":
-			if err := a.showStatus(ctx); err != nil {
-				a.logError(err)
-			}
-		case "7", "q", "quit", "exit":
-			return nil
-		default:
-			fmt.Fprintln(a.errOut, "Choose a number from 1 to 7")
-		}
-	}
-}
-
-func (a *application) promptConfiguration(cfg config.Config) error {
-	var err error
-	if cfg.DeviceURL, err = a.readLine("Device URL", cfg.DeviceURL); err != nil {
-		return err
-	}
-	if cfg.PollInterval, err = a.readLine("Quota poll interval", cfg.PollInterval); err != nil {
-		return err
-	}
-	if cfg.CodexPath, err = a.readLine("Codex executable", cfg.CodexPath); err != nil {
-		return err
-	}
-	contextDefault := "y"
-	if !cfg.ContextEnabled {
-		contextDefault = "n"
-	}
-	value, err := a.readLine("Enable experimental context gauge? (y/n)", contextDefault)
-	if err != nil {
-		return err
-	}
-	switch strings.ToLower(value) {
-	case "y", "yes":
-		cfg.ContextEnabled = true
-	case "n", "no":
-		cfg.ContextEnabled = false
-	default:
-		return fmt.Errorf("context choice must be y or n")
-	}
-	if err := config.Save(a.configPath, cfg); err != nil {
-		return err
-	}
-	fmt.Fprintf(a.out, "Configuration saved to %s\n", a.configPath)
-	return nil
-}
-
-func (a *application) readLine(label, defaultValue string) (string, error) {
-	fmt.Fprintf(a.out, "%s [%s]: ", label, defaultValue)
-	line, err := a.in.ReadString('\n')
-	if err != nil && !errors.Is(err, io.EOF) {
-		return "", err
-	}
-	if errors.Is(err, io.EOF) && len(line) > 0 {
-		err = nil
-	}
-	line = strings.TrimSpace(line)
-	if line == "" {
-		line = defaultValue
-	}
-	return line, err
 }
 
 func (a *application) loadClient() (config.Config, *device.Client, error) {
