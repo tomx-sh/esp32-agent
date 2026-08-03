@@ -20,10 +20,11 @@ import (
 )
 
 type Options struct {
-	In      io.Reader
-	Out     io.Writer
-	ErrOut  io.Writer
-	Version string
+	In             io.Reader
+	Out            io.Writer
+	ErrOut         io.Writer
+	Version        string
+	ExecutablePath string
 }
 
 type application struct {
@@ -31,6 +32,7 @@ type application struct {
 	out        io.Writer
 	errOut     io.Writer
 	version    string
+	executable string
 	configPath string
 	statePath  string
 	verbose    bool
@@ -44,6 +46,7 @@ func New(options Options) *cobra.Command {
 		out:        options.Out,
 		errOut:     options.ErrOut,
 		version:    options.Version,
+		executable: options.ExecutablePath,
 		configPath: configPath,
 		statePath:  statePath,
 	}
@@ -64,6 +67,7 @@ func New(options Options) *cobra.Command {
 	root.PersistentFlags().StringVar(&app.configPath, "config", configPath, "configuration file path")
 	root.PersistentFlags().BoolVarP(&app.verbose, "verbose", "v", false, "show diagnostic details")
 	root.AddCommand(
+		app.setupCommand(),
 		app.configureCommand(),
 		app.syncCommand(),
 		app.runCommand(),
@@ -75,11 +79,26 @@ func New(options Options) *cobra.Command {
 	return root
 }
 
+func (a *application) setupCommand() *cobra.Command {
+	defaultPath, _ := hooks.DefaultConfigPath()
+	var hooksPath string
+	cmd := &cobra.Command{
+		Use:   "setup",
+		Short: "Configure and connect the companion for first use",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.runSetup(cmd.Context(), hooksPath)
+		},
+	}
+	cmd.Flags().StringVar(&hooksPath, "hooks-path", defaultPath, "Codex hooks.json path")
+	return cmd
+}
+
 func (a *application) configureCommand() *cobra.Command {
 	var deviceURL, pollInterval, codexPath, contextMode string
 	cmd := &cobra.Command{
 		Use:   "configure",
-		Short: "Configure the device and Codex connection",
+		Short: "Change settings without modifying Codex hooks",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := config.Load(a.configPath)
 			if err != nil {
@@ -111,7 +130,7 @@ func (a *application) configureCommand() *cobra.Command {
 			if err := config.Save(a.configPath, cfg); err != nil {
 				return err
 			}
-			fmt.Fprintf(a.out, "Configuration saved to %s\n", a.configPath)
+			a.reportConfigurationSaved()
 			return nil
 		},
 	}
@@ -193,7 +212,7 @@ func (a *application) hooksCommand() *cobra.Command {
 			if err := a.installHooks(hooksPath); err != nil {
 				return err
 			}
-			fmt.Fprintf(a.out, "Codex hooks installed in %s\nReview and trust them from /hooks in Codex.\n", hooksPath)
+			a.reportHooksInstalled(hooksPath)
 			return nil
 		},
 	})
@@ -363,9 +382,13 @@ func (a *application) runBridge(ctx context.Context) error {
 }
 
 func (a *application) installHooks(path string) error {
-	executable, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("find companion executable: %w", err)
+	executable := a.executable
+	if executable == "" {
+		var err error
+		executable, err = os.Executable()
+		if err != nil {
+			return fmt.Errorf("find companion executable: %w", err)
+		}
 	}
 	executable, _ = filepath.Abs(executable)
 	if strings.Contains(executable, string(filepath.Separator)+"go-build"+string(filepath.Separator)) {
@@ -420,12 +443,58 @@ func (a *application) showStatus(ctx context.Context) error {
 	fmt.Fprintf(a.out, "  Device URL:    %s\n", cfg.DeviceURL)
 	fmt.Fprintf(a.out, "  Poll interval: %s\n", cfg.PollInterval)
 	fmt.Fprintf(a.out, "  Context:       %t (experimental transcript reader)\n", cfg.ContextEnabled)
+	hooksPath, hooksPathErr := hooks.DefaultConfigPath()
+	if hooksPathErr == nil {
+		fmt.Fprintf(a.out, "  Hooks file:    %s\n", hooksPath)
+		installed, installedErr := hooks.IsInstalled(hooksPath)
+		switch {
+		case installedErr != nil:
+			fmt.Fprintf(a.out, "  Hooks:         unavailable (%v)\n", installedErr)
+		case installed:
+			fmt.Fprintf(a.out, "  Hooks:         installed (%d lifecycle commands)\n", len(hooks.ManagedEvents()))
+		default:
+			fmt.Fprintln(a.out, "  Hooks:         not installed")
+		}
+	} else {
+		fmt.Fprintf(a.out, "  Hooks file:    unavailable (%v)\n", hooksPathErr)
+	}
 	value, stateErr := state.Load(a.statePath)
 	if stateErr == nil && value.ActiveTranscript != "" {
 		fmt.Fprintf(a.out, "  Transcript:    %s\n", value.ActiveTranscript)
 	}
 	fmt.Fprintln(a.out)
 	return a.showDevice(ctx)
+}
+
+func (a *application) reportConfigurationSaved() {
+	fmt.Fprintf(a.out, "Configuration saved to %s\n", a.configPath)
+	fmt.Fprintln(a.out, "Codex hooks were not changed by this settings command.")
+	path, err := hooks.DefaultConfigPath()
+	if err != nil {
+		fmt.Fprintf(a.out, "Hooks file: unavailable (%v)\n", err)
+		return
+	}
+	fmt.Fprintf(a.out, "Hooks file: %s\n", path)
+	installed, err := hooks.IsInstalled(path)
+	if err != nil {
+		fmt.Fprintf(a.out, "Hooks status: unavailable (%v)\n", err)
+		return
+	}
+	if installed {
+		fmt.Fprintf(a.out, "Hooks status: ESP32 Agent commands remain installed for %s.\n", managedEventsText())
+		return
+	}
+	fmt.Fprintln(a.out, "Hooks status: ESP32 Agent commands are not installed.")
+	fmt.Fprintln(a.out, "Next: run `esp32-agent hooks install` to add the lifecycle commands, or `esp32-agent setup` for the guided flow.")
+}
+
+func (a *application) reportHooksInstalled(path string) {
+	fmt.Fprintf(a.out, "Added ESP32 Agent commands for %s to %s.\n", managedEventsText(), path)
+	fmt.Fprintln(a.out, "Next: open /hooks in Codex Desktop and review/trust the new definitions.")
+}
+
+func managedEventsText() string {
+	return strings.Join(hooks.ManagedEvents(), ", ")
 }
 
 func (a *application) logError(err error) {

@@ -2,11 +2,17 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/tomx-sh/esp32-agent/companion/internal/config"
+	"github.com/tomx-sh/esp32-agent/companion/internal/hooks"
 )
 
 func TestHelpListsMainOperations(t *testing.T) {
@@ -16,7 +22,7 @@ func TestHelpListsMainOperations(t *testing.T) {
 	if err := command.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"configure", "device", "hooks", "run", "status", "sync"} {
+	for _, name := range []string{"configure", "device", "hooks", "run", "setup", "status", "sync"} {
 		if !strings.Contains(out.String(), name) {
 			t.Fatalf("help does not contain %q:\n%s", name, out.String())
 		}
@@ -25,12 +31,12 @@ func TestHelpListsMainOperations(t *testing.T) {
 
 func TestNoArgumentsStartsInteractiveGuide(t *testing.T) {
 	var out bytes.Buffer
-	command := New(Options{In: strings.NewReader("7\n"), Out: &out, ErrOut: &out, Version: "test"})
+	command := New(Options{In: strings.NewReader("8\n"), Out: &out, ErrOut: &out, Version: "test"})
 	command.SetArgs(nil)
 	if err := command.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "ESP32 Agent Companion") || !strings.Contains(out.String(), "Install Codex Desktop hooks") {
+	if !strings.Contains(out.String(), "ESP32 Agent Companion") || !strings.Contains(out.String(), "Set up companion") || !strings.Contains(out.String(), "Configure settings") {
 		t.Fatalf("interactive guide missing expected choices:\n%s", out.String())
 	}
 }
@@ -45,6 +51,8 @@ func TestNoArgumentsWithEmptyInputExits(t *testing.T) {
 }
 
 func TestConfigureUsesInteractiveForm(t *testing.T) {
+	codexHome := t.TempDir()
+	t.Setenv("CODEX_HOME", codexHome)
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	input := strings.NewReader("http://device.test\n30s\n/usr/local/bin/codex\nn\n")
 	var out bytes.Buffer
@@ -62,4 +70,128 @@ func TestConfigureUsesInteractiveForm(t *testing.T) {
 	if cfg.DeviceURL != "http://device.test" || cfg.PollInterval != "30s" || cfg.CodexPath != "/usr/local/bin/codex" || cfg.ContextEnabled {
 		t.Fatalf("unexpected configuration: %+v", cfg)
 	}
+	hooksPath := filepath.Join(codexHome, "hooks.json")
+	if _, err := os.Stat(hooksPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("configure unexpectedly created hooks file: %v", err)
+	}
+	for _, expected := range []string{
+		"Configuration saved to " + configPath,
+		"Codex hooks were not changed",
+		"Hooks file: " + hooksPath,
+		"esp32-agent hooks install",
+	} {
+		if !strings.Contains(out.String(), expected) {
+			t.Fatalf("configure output does not contain %q:\n%s", expected, out.String())
+		}
+	}
+}
+
+func TestSetupConfiguresTestsAndInstallsHooks(t *testing.T) {
+	server := newDeviceServer(t)
+	defer server.Close()
+	codexHome := t.TempDir()
+	t.Setenv("CODEX_HOME", codexHome)
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	input := strings.NewReader(server.URL + "\n30s\ncodex\nn\ny\n")
+	var out bytes.Buffer
+	command := New(Options{
+		In:             input,
+		Out:            &out,
+		ErrOut:         &out,
+		Version:        "test",
+		ExecutablePath: "/usr/local/bin/esp32-agent",
+	})
+	command.SetArgs([]string{"--config", configPath, "setup"})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	hooksPath := filepath.Join(codexHome, "hooks.json")
+	installed, err := hooks.IsInstalled(hooksPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !installed {
+		t.Fatal("setup did not install the managed hooks")
+	}
+	for _, expected := range []string{
+		"Testing device connection",
+		"Device connected",
+		"Setup complete",
+		"Hooks file:    " + hooksPath,
+		"added commands for SessionStart, UserPromptSubmit, Stop, SessionEnd",
+		"open /hooks in Codex Desktop",
+	} {
+		if !strings.Contains(out.String(), expected) {
+			t.Fatalf("setup output does not contain %q:\n%s", expected, out.String())
+		}
+	}
+}
+
+func TestStatusShowsHooksFileAndInstallationState(t *testing.T) {
+	server := newDeviceServer(t)
+	defer server.Close()
+	codexHome := t.TempDir()
+	t.Setenv("CODEX_HOME", codexHome)
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cfg := config.Default()
+	cfg.DeviceURL = server.URL
+	if err := config.Save(configPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+	hooksPath := filepath.Join(codexHome, "hooks.json")
+	if err := hooks.Install(hooksPath, "/usr/local/bin/esp32-agent"); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	command := New(Options{In: strings.NewReader(""), Out: &out, ErrOut: &out, Version: "test"})
+	command.SetArgs([]string{"--config", configPath, "status"})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Hooks file:    "+hooksPath) || !strings.Contains(out.String(), "Hooks:         installed (4 lifecycle commands)") {
+		t.Fatalf("status does not show installed hooks:\n%s", out.String())
+	}
+}
+
+func TestHooksInstallExplainsChanges(t *testing.T) {
+	hooksPath := filepath.Join(t.TempDir(), "hooks.json")
+	var out bytes.Buffer
+	command := New(Options{
+		In:             strings.NewReader(""),
+		Out:            &out,
+		ErrOut:         &out,
+		Version:        "test",
+		ExecutablePath: "/usr/local/bin/esp32-agent",
+	})
+	command.SetArgs([]string{"hooks", "--path", hooksPath, "install"})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Added ESP32 Agent commands for SessionStart, UserPromptSubmit, Stop, SessionEnd to "+hooksPath) {
+		t.Fatalf("hooks install does not explain its changes:\n%s", out.String())
+	}
+}
+
+func newDeviceServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		var value any
+		switch request.URL.Path {
+		case "/codex/usage":
+			value = map[string]any{"remainingPercent": 57, "resetAt": 0, "resetCredits": 2}
+		case "/codex/context":
+			value = map[string]any{"remainingPercent": 81}
+		case "/codex/message":
+			value = map[string]any{"message": "Ready", "muted": false}
+		default:
+			http.NotFound(response, request)
+			return
+		}
+		if err := json.NewEncoder(response).Encode(value); err != nil {
+			t.Errorf("encode device response: %v", err)
+		}
+	}))
 }

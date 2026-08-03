@@ -13,6 +13,10 @@ const managedStatusPrefix = "ESP32 Agent:"
 
 var installedEvents = []string{"SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"}
 
+func ManagedEvents() []string {
+	return append([]string(nil), installedEvents...)
+}
+
 func DefaultConfigPath() (string, error) {
 	if codexHome := os.Getenv("CODEX_HOME"); codexHome != "" {
 		return filepath.Join(codexHome, "hooks.json"), nil
@@ -58,6 +62,48 @@ func Uninstall(path string) error {
 	}
 	removeManaged(hookMap)
 	return writeHookFile(path, root)
+}
+
+func IsInstalled(path string) (bool, error) {
+	root, err := readHookFile(path)
+	if err != nil {
+		return false, err
+	}
+	hookMap, ok := root["hooks"].(map[string]any)
+	if !ok {
+		return false, nil
+	}
+	for _, event := range installedEvents {
+		groups, ok := hookMap[event].([]any)
+		if !ok || !hasManagedHandler(groups) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func hasManagedHandler(groups []any) bool {
+	for _, rawGroup := range groups {
+		group, ok := rawGroup.(map[string]any)
+		if !ok {
+			continue
+		}
+		handlers, ok := group["hooks"].([]any)
+		if !ok {
+			continue
+		}
+		for _, rawHandler := range handlers {
+			handler, ok := rawHandler.(map[string]any)
+			if !ok {
+				continue
+			}
+			status, _ := handler["statusMessage"].(string)
+			if strings.HasPrefix(status, managedStatusPrefix) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func readHookFile(path string) (map[string]any, error) {

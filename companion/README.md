@@ -36,15 +36,18 @@ Running the tool without a command opens a styled interactive guide for the prim
 esp32-agent
 ```
 
-Use the arrow keys and Enter to choose an operation; Ctrl-C exits. The guide can
-configure the device, test connectivity, sync once, start the bridge, install
-hooks, and show status. It automatically falls back to simple numbered prompts
-when a terminal UI is unavailable or `ACCESSIBLE` is set.
+Use the arrow keys and Enter to choose an operation; Ctrl-C exits. The first
+option runs the complete first-time setup: it saves the settings, tests the
+device, and asks before installing global Codex hooks. Settings-only
+configuration, one-off sync, the bridge, hooks, and status remain available as
+separate operations. The guide automatically falls back to simple numbered
+prompts when a terminal UI is unavailable or `ACCESSIBLE` is set.
 
 ## Commands
 
 ```text
-esp32-agent configure       Configure the device URL, polling, Codex path, and context reader
+esp32-agent setup           Run the guided first-time setup
+esp32-agent configure       Change settings without modifying Codex hooks
 esp32-agent device test     Verify connectivity and display current device values
 esp32-agent sync            Sync quota and context once
 esp32-agent run             Run the foreground bridge until interrupted
@@ -60,7 +63,17 @@ Every command supports `--help`. Use `--config PATH` to select another configura
 
 ## First-time setup
 
-Configure interactively:
+Run the complete guided flow:
+
+```sh
+esp32-agent setup
+```
+
+Setup configures the companion, tests the device, and then explicitly asks
+whether to add the four lifecycle commands to the displayed Codex hooks file.
+It ends with a summary of every path and change.
+
+To change settings later without modifying hooks, run:
 
 ```sh
 esp32-agent configure
@@ -76,7 +89,7 @@ esp32-agent configure \
   --context on
 ```
 
-Test the device, install global Codex hooks, and start the bridge:
+The equivalent manual flow is:
 
 ```sh
 esp32-agent device test

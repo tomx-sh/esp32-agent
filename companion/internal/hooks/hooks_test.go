@@ -27,6 +27,13 @@ func TestInstallAndUninstallPreserveOtherHooks(t *testing.T) {
 	if err := Install(path, "/opt/esp32 agent/bin/esp32-agent"); err != nil {
 		t.Fatal(err)
 	}
+	installed, err := IsInstalled(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !installed {
+		t.Fatal("managed hooks were not detected after installation")
+	}
 	root := readJSON(t, path)
 	if root["custom"] != "keep" {
 		t.Fatalf("unknown top-level field was not preserved: %#v", root)
@@ -44,9 +51,26 @@ func TestInstallAndUninstallPreserveOtherHooks(t *testing.T) {
 	if err := Uninstall(path); err != nil {
 		t.Fatal(err)
 	}
+	installed, err = IsInstalled(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if installed {
+		t.Fatal("managed hooks were still detected after uninstall")
+	}
 	after := string(mustRead(t, path))
 	if strings.Contains(after, managedStatusPrefix) || !strings.Contains(after, "other-hook") {
 		t.Fatalf("unexpected hooks after uninstall: %s", after)
+	}
+}
+
+func TestIsInstalledReturnsFalseForMissingFile(t *testing.T) {
+	installed, err := IsInstalled(filepath.Join(t.TempDir(), "hooks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if installed {
+		t.Fatal("missing hooks file reported as installed")
 	}
 }
 

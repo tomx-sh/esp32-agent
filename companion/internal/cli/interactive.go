@@ -17,6 +17,7 @@ import (
 type interactiveAction string
 
 const (
+	actionSetup     interactiveAction = "setup"
 	actionConfigure interactiveAction = "configure"
 	actionTest      interactiveAction = "test"
 	actionSync      interactiveAction = "sync"
@@ -37,6 +38,14 @@ func (a *application) interactive(ctx context.Context) error {
 		}
 
 		switch action {
+		case actionSetup:
+			path, err := hooks.DefaultConfigPath()
+			if err == nil {
+				err = a.runSetup(ctx, path)
+			}
+			if err != nil && !promptCanceled(err) {
+				a.logError(err)
+			}
 		case actionConfigure:
 			cfg, err := config.Load(a.configPath)
 			if err == nil {
@@ -67,7 +76,7 @@ func (a *application) interactive(ctx context.Context) error {
 			if err != nil {
 				a.logError(err)
 			} else {
-				fmt.Fprintln(a.out, "Hooks installed. Review and trust them from /hooks in Codex.")
+				a.reportHooksInstalled(path)
 			}
 		case actionStatus:
 			if err := a.showStatus(ctx); err != nil {
@@ -87,7 +96,8 @@ func (a *application) promptAction(ctx context.Context) (interactiveAction, erro
 				Title("ESP32 Agent Companion").
 				Description("Connect Codex Desktop activity and usage to your device.").
 				Options(
-					huh.NewOption("Configure companion", actionConfigure),
+					huh.NewOption("Set up companion", actionSetup),
+					huh.NewOption("Configure settings", actionConfigure),
 					huh.NewOption("Test device connection", actionTest),
 					huh.NewOption("Sync Codex data now", actionSync),
 					huh.NewOption("Run foreground bridge", actionRun),
@@ -105,6 +115,18 @@ func (a *application) promptAction(ctx context.Context) (interactiveAction, erro
 }
 
 func (a *application) promptConfiguration(ctx context.Context, cfg config.Config) error {
+	cfg, err := a.promptConfigurationValues(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	if err := config.Save(a.configPath, cfg); err != nil {
+		return err
+	}
+	a.reportConfigurationSaved()
+	return nil
+}
+
+func (a *application) promptConfigurationValues(ctx context.Context, cfg config.Config) (config.Config, error) {
 	err := a.runPromptForm(ctx,
 		huh.NewGroup(
 			huh.NewInput().
@@ -147,16 +169,64 @@ func (a *application) promptConfiguration(ctx context.Context, cfg config.Config
 			Description("Review the current values and save when finished."),
 	)
 	if err != nil {
-		return err
+		return config.Config{}, err
 	}
 
 	cfg.DeviceURL = strings.TrimSpace(cfg.DeviceURL)
 	cfg.PollInterval = strings.TrimSpace(cfg.PollInterval)
 	cfg.CodexPath = strings.TrimSpace(cfg.CodexPath)
+	return cfg, nil
+}
+
+func (a *application) runSetup(ctx context.Context, hooksPath string) error {
+	cfg, err := config.Load(a.configPath)
+	if err != nil {
+		return err
+	}
+	cfg, err = a.promptConfigurationValues(ctx, cfg)
+	if err != nil {
+		return err
+	}
 	if err := config.Save(a.configPath, cfg); err != nil {
 		return err
 	}
-	fmt.Fprintf(a.out, "Configuration saved to %s\n", a.configPath)
+	fmt.Fprintf(a.out, "Configuration saved to %s\n\n", a.configPath)
+	fmt.Fprintln(a.out, "Testing device connection...")
+	if err := a.showDevice(ctx); err != nil {
+		return fmt.Errorf("device test failed: %w", err)
+	}
+
+	install := true
+	err = a.runPromptForm(ctx,
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Install Codex Desktop hooks?").
+				Description(fmt.Sprintf("Adds %s commands to %s.", managedEventsText(), hooksPath)).
+				Affirmative("Install").
+				Negative("Skip").
+				Value(&install),
+		),
+	)
+	if err != nil {
+		return err
+	}
+	if install {
+		if err := a.installHooks(hooksPath); err != nil {
+			return err
+		}
+	}
+
+	fmt.Fprintln(a.out, "\nSetup complete")
+	fmt.Fprintf(a.out, "  Configuration: %s\n", a.configPath)
+	fmt.Fprintln(a.out, "  Device:        connected")
+	fmt.Fprintf(a.out, "  Hooks file:    %s\n", hooksPath)
+	if install {
+		fmt.Fprintf(a.out, "  Hooks:         added commands for %s\n", managedEventsText())
+		fmt.Fprintln(a.out, "Next: open /hooks in Codex Desktop and review/trust the new definitions.")
+	} else {
+		fmt.Fprintln(a.out, "  Hooks:         not installed (skipped)")
+		fmt.Fprintln(a.out, "Next: run `esp32-agent hooks install` when you want to enable lifecycle updates.")
+	}
 	return nil
 }
 
